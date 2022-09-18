@@ -1,10 +1,8 @@
-use hyper;
-use hyper_rustls;
 use crate::auth;
-use bigquery::api::{Content, TableCell, TableFieldSchema, TableRow};
-use bigquery::Bigquery;
-use chrono::prelude::*;
 use google_bigquery2 as bigquery;
+use bigquery::api::{Content, TableCell, TableFieldSchema, TableRow};
+use bigquery::{Bigquery, hyper, hyper_rustls};
+use chrono::prelude::*;
 
 use anyhow;
 use anyhow::Result;
@@ -15,7 +13,7 @@ use serde::{Deserialize};
 use serde::ser::{Serialize as Serialize1, Serializer, SerializeSeq, SerializeMap};
 
 pub struct Bq {
-    api: Bigquery,
+    api: Bigquery<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
     project: String,
 }
 
@@ -545,7 +543,8 @@ impl Bq {
         let bq_rows: Vec<BqRow> = if let (Ok(tres), Ok(res)) = (&table_result, &result) {
             let empty: Vec<TableRow> = vec![];
             let rows = res.1.rows.as_ref().unwrap_or(&empty);
-            tres.1
+            //println!("{:?}", res);
+            let mut tmp_rows: Vec<BqRow> = tres.1
                 .schema
                 .as_ref()
                 .map(|schema| {
@@ -573,7 +572,13 @@ impl Bq {
                         })
                         .unwrap_or(vec![])
                 })
-                .unwrap_or(vec![])
+                .unwrap_or(vec![]);
+            if let Some(token) = &res.1.page_token {
+                let mut param = p.clone();
+                param.page_token(&token);
+                tmp_rows.extend(self.list_tabledata(table, &param).await?);
+            }
+            tmp_rows
         } else {
             vec![]
         };

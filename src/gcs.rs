@@ -38,7 +38,7 @@ impl GcsObject {
 }
 
 pub struct Gcs {
-    api: Storage,
+    api: Storage<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
     bucket: String,
 }
 

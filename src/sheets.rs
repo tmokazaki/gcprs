@@ -9,7 +9,7 @@ use anyhow;
 use anyhow::Result;
 
 pub struct SpreadSheet {
-    api: Sheets,
+    api: Sheets<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
 }
 
 
