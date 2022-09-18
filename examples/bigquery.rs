@@ -9,7 +9,8 @@ use anyhow::Result;
 async fn main() -> Result<()> {
     //let spauth = auth::GcpAuth::from_service_account().await.unwrap();
     let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
-    let project = "blocks-gcp-82d5249c";//"blocks-gn-okazaki";
+    let project = "blocks-gn-okazaki";
+    //let project = "blocks-gcp-82d5249c";
     let bigquery = bigquery::Bq::new(spauth, &project).unwrap();
     let mut list_params = BqListParam::new();
     let datasets = bigquery.list_dataset(&list_params).await?;
@@ -36,18 +37,11 @@ async fn main() -> Result<()> {
     //let tables = bigquery.list_tables(&datasets[5], &list_params).await?;
     //println!("tables: {:?}", tables);
     list_params.max_results(10);
-    let bqtable = bigquery::BqTable {
-        dataset: bigquery::BqDataset {
-            dataset_id: "optimization_prod".to_string(),
-            project_id: project.to_string(),
-        },
-        table_id: "locations_F".to_string(),
-        created_at: None,
-        expired_at: None,
-    };
+    let bqtable = BqTable::new(&project, "binpacking_sbm", &"coefficients");
     let data = bigquery
             .list_tabledata(&bqtable, &list_params)
             .await?;
+    println!("{:?}", data);
     let jstr = serde_json::to_string(&data).unwrap();
     println!("{:}", jstr);
     //println!(
