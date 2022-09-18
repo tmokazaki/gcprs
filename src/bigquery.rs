@@ -44,8 +44,8 @@ impl BqListParam {
 
 #[derive(Clone, Debug)]
 pub struct BqDataset {
-    pub dataset_id: String,
-    pub project_id: String,
+    dataset_id: String,
+    project_id: String,
 }
 
 impl BqDataset {
@@ -213,10 +213,7 @@ impl string::ToString for BqColumn {
 
 impl BqColumn {
     fn new(cell: &TableCell, schema: &BqTableSchema) -> Self {
-        let name = match &schema.name {
-            Some(name) => Some(name.to_string()),
-            _ => None,
-        };
+        let name = schema.name.clone();
         let value = match &schema.type_ {
             BqType::STRING => {
                 if let Content::Value(s) = &cell.v {
@@ -261,19 +258,15 @@ impl BqColumn {
             }
             BqType::RECORD => match schema.mode {
                 BqMode::REPEATED => {
-                    if let Content::Repeated(cells) = &cell.v {
-                        let repeat_schema = BqTableSchema {
-                            name: None,
-                            type_: schema.type_.clone(),
-                            mode: schema.mode.clone(),
-                            schemas: schema.schemas.clone(),
-                        };
+                    match &cell.v {
+                      Content::Repeated(cells) => {
                         let columns = cells
                             .iter()
-                            .map(|cell| BqColumn::new(cell, &repeat_schema))
+                            .map(|c| Box::new(BqColumn::new(c, &schema).value))
                             .collect();
-                        BqValue::BqRepeated { records: columns }
-                    } else if let Content::Struct(row) = &cell.v {
+                        BqValue::BqRepeated(columns)
+                      },
+                      Content::Struct(row) => {
                         let columns: Vec<BqColumn> = match &row.f {
                             Some(cs) => cs
                                 .iter()
@@ -282,9 +275,9 @@ impl BqColumn {
                                 .collect(),
                             None => vec![],
                         };
-                        BqValue::BqRecord(columns)
-                    } else {
-                        BqValue::BqNull
+                        BqValue::BqStruct(columns)
+                      },
+                      _ => BqValue::BqNull
                     }
                 }
                 _ => {
@@ -297,7 +290,7 @@ impl BqColumn {
                                 .collect(),
                             None => vec![],
                         };
-                        BqValue::BqRecord(columns)
+                        BqValue::BqStruct(columns)
                     } else {
                         BqValue::BqNull
                     }
@@ -317,8 +310,8 @@ enum BqValue {
     BqFloat(f64),
     BqBool(bool),
     BqTimestamp(DateTime<Utc>),
-    BqRecord(Vec<BqColumn>),
-    BqRepeated { records: Vec<BqColumn> },
+    BqStruct(Vec<BqColumn>),
+    BqRepeated(Vec<Box<BqValue>>),
     BqNull,
 }
 
@@ -333,7 +326,7 @@ impl Serialize1 for BqValue {
             BqValue::BqFloat(n) => serializer.serialize_f64(*n),
             BqValue::BqBool(b) => serializer.serialize_bool(*b),
             BqValue::BqTimestamp(t) => serializer.serialize_str(&t.to_rfc3339()),
-            BqValue::BqRecord(rs) => {
+            BqValue::BqStruct(rs) => {
                 let mut map = serializer.serialize_map(Some(rs.len()))?;
                 for elem in rs {
                     map.serialize_entry(
@@ -341,12 +334,10 @@ impl Serialize1 for BqValue {
                 }
                 map.end()
             }
-            BqValue::BqRepeated{ records: rs} => {
+            BqValue::BqRepeated(rs) => {
                 let mut seq = serializer.serialize_seq(Some(rs.len()))?;
                 for column in rs {
-                    if None == column.name {
-                        seq.serialize_element(&column.value)?;
-                    }
+                    seq.serialize_element(&column)?;
                 }
                 seq.end()
             }
@@ -363,7 +354,7 @@ impl string::ToString for BqValue {
             BqValue::BqFloat(n) => format!("{}", n),
             BqValue::BqBool(b) => format!("{}", b),
             BqValue::BqTimestamp(t) => format!("\"{}\"", t),
-            BqValue::BqRecord(rs) => {
+            BqValue::BqStruct(rs) => {
                 let rs_str = rs
                     .iter()
                     .map(|r| r.to_string())
@@ -372,7 +363,7 @@ impl string::ToString for BqValue {
                     .join(",");
                 format!("{{{}}}", rs_str)
             }
-            BqValue::BqRepeated { records: rs } => {
+            BqValue::BqRepeated(rs) => {
                 let rs_str = rs
                     .iter()
                     .map(|r| r.to_string())
