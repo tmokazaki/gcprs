@@ -1,9 +1,9 @@
 use crate::auth;
 use google_sheets4 as sheets4;
-use sheets4::{Sheets};
-use sheets4::api::ValueRange;
 use hyper;
 use hyper_rustls;
+use sheets4::api::ValueRange;
+use sheets4::Sheets;
 
 use anyhow;
 use anyhow::Result;
@@ -11,7 +11,6 @@ use anyhow::Result;
 pub struct SpreadSheet {
     api: Sheets<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct ValuesGetParam {
@@ -31,7 +30,7 @@ impl ValuesGetParam {
             _range_notation: Default::default(),
             _value_render_option: Default::default(),
             _major_dimention: Default::default(),
-            _date_time_render_option: Default::default()
+            _date_time_render_option: Default::default(),
         }
     }
 
@@ -45,7 +44,7 @@ impl ValuesGetParam {
 pub enum ValueRenderOption {
     FormattedValue,
     UnformattedValue,
-    Formula
+    Formula,
 }
 
 impl ValueRenderOption {
@@ -53,7 +52,7 @@ impl ValueRenderOption {
         match self {
             ValueRenderOption::FormattedValue => "FORMATTED_VALUE",
             ValueRenderOption::UnformattedValue => "UNFORMATTED_VALUE",
-            ValueRenderOption::Formula => "FORMULA"
+            ValueRenderOption::Formula => "FORMULA",
         }
     }
 }
@@ -69,19 +68,20 @@ impl SpreadSheet {
                 .build(),
         );
         let hub = Sheets::new(client, auth.authenticator());
-        Ok(SpreadSheet {
-            api: hub,
-        })
+        Ok(SpreadSheet { api: hub })
     }
 
     pub async fn get_values(&self, p: &ValuesGetParam) -> Result<ValueRange> {
         // https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/get
-        let mut s = self.api.spreadsheets().values_get(&p._sheet_id, &p._sheet_name);
+        let mut s = self
+            .api
+            .spreadsheets()
+            .values_get(&p._sheet_id, &p._sheet_name);
         if let Some(ro) = &p._value_render_option {
             s = s.value_render_option(ro.as_str());
         }
-            //.major_dimension("sed")
-            //.date_time_render_option("duo")
+        //.major_dimension("sed")
+        //.date_time_render_option("duo")
         let result = s.doit().await?;
 
         Ok(result.1)

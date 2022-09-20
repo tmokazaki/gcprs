@@ -1,16 +1,17 @@
 use crate::auth;
-use google_bigquery2 as bigquery;
 use bigquery::api::{Content, TableCell, TableFieldSchema, TableRow};
-use bigquery::{Bigquery, hyper, hyper_rustls};
+use bigquery::{hyper, hyper_rustls, Bigquery};
 use chrono::prelude::*;
+use google_bigquery2 as bigquery;
 
 use anyhow;
 use anyhow::Result;
 use async_recursion::async_recursion;
 use rayon::prelude::*;
+use serde::ser::{Serialize as Serialize1, SerializeMap, SerializeSeq, Serializer};
+use serde::Deserialize;
 use std::string;
-use serde::{Deserialize};
-use serde::ser::{Serialize as Serialize1, Serializer, SerializeSeq, SerializeMap};
+use std::collections::HashMap;
 
 pub struct Bq {
     api: Bigquery<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
@@ -60,10 +61,10 @@ impl BqDataset {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct BqTable {
-    pub dataset: BqDataset,
-    pub table_id: String,
-    pub created_at: Option<u64>,
-    pub expired_at: Option<u64>,
+    dataset: BqDataset,
+    table_id: String,
+    created_at: Option<u64>,
+    expired_at: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -135,7 +136,28 @@ enum BqType {
 
 #[derive(Debug, Deserialize)]
 pub struct BqRow {
+    _name_index: HashMap<String, i32>,
     columns: Vec<BqColumn>,
+}
+
+impl BqRow {
+    pub fn new(columns: Vec<BqColumn>) -> Self {
+        let name_index: HashMap<String, i32> = HashMap::from_iter(columns
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.name.as_ref().unwrap_or(&"".to_string()).clone(), i as i32)));
+        BqRow {
+            _name_index: name_index,
+            columns: columns,
+        }
+    }
+    pub fn get(&self, key: &str) -> Option<&BqValue> {
+        self._name_index.get(key).map(|idx| &self.columns[*idx as usize].value)
+    }
+
+    pub fn len(&self) -> usize {
+        self.columns.len()
+    }
 }
 
 impl string::ToString for BqRow {
@@ -174,30 +196,12 @@ impl Serialize1 for BqRow {
         S: Serializer,
     {
         let mut map = serializer.serialize_map(Some(self.columns.len()))?;
-
         for c in &self.columns {
-            match &c.value {
-                BqValue::BqString(s) => {
-                    map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &s)?
-                }
-                BqValue::BqInteger(i) => {
-                    map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &i)?
-                }
-                BqValue::BqFloat(f) => {
-                    map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &f)?
-                }
-                BqValue::BqBool(b) => {
-                    map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &b)?
-                }
-                _ => {
-                    map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &c.value)?
-                }
-            }
+            map.serialize_entry(&c.name.as_ref().unwrap_or(&"".to_string()), &c.value)?;
         }
         map.end()
     }
 }
-
 
 impl string::ToString for BqColumn {
     fn to_string(&self) -> String {
@@ -257,16 +261,15 @@ impl BqColumn {
                 }
             }
             BqType::RECORD => match schema.mode {
-                BqMode::REPEATED => {
-                    match &cell.v {
-                      Content::Repeated(cells) => {
+                BqMode::REPEATED => match &cell.v {
+                    Content::Repeated(cells) => {
                         let columns = cells
                             .iter()
                             .map(|c| Box::new(BqColumn::new(c, &schema).value))
                             .collect();
                         BqValue::BqRepeated(columns)
-                      },
-                      Content::Struct(row) => {
+                    }
+                    Content::Struct(row) => {
                         let columns: Vec<BqColumn> = match &row.f {
                             Some(cs) => cs
                                 .iter()
@@ -275,11 +278,10 @@ impl BqColumn {
                                 .collect(),
                             None => vec![],
                         };
-                        BqValue::BqStruct(columns)
-                      },
-                      _ => BqValue::BqNull
+                        BqValue::BqStruct(BqRow::new(columns))
                     }
-                }
+                    _ => BqValue::BqNull,
+                },
                 _ => {
                     if let Content::Struct(row) = &cell.v {
                         let columns: Vec<BqColumn> = match &row.f {
@@ -290,7 +292,7 @@ impl BqColumn {
                                 .collect(),
                             None => vec![],
                         };
-                        BqValue::BqStruct(columns)
+                        BqValue::BqStruct(BqRow::new(columns))
                     } else {
                         BqValue::BqNull
                     }
@@ -304,13 +306,13 @@ impl BqColumn {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-enum BqValue {
+pub enum BqValue {
     BqString(String),
     BqInteger(i64),
     BqFloat(f64),
     BqBool(bool),
     BqTimestamp(DateTime<Utc>),
-    BqStruct(Vec<BqColumn>),
+    BqStruct(BqRow),
     BqRepeated(Vec<Box<BqValue>>),
     BqNull,
 }
@@ -328,9 +330,11 @@ impl Serialize1 for BqValue {
             BqValue::BqTimestamp(t) => serializer.serialize_str(&t.to_rfc3339()),
             BqValue::BqStruct(rs) => {
                 let mut map = serializer.serialize_map(Some(rs.len()))?;
-                for elem in rs {
+                for elem in &rs.columns {
                     map.serialize_entry(
-                        &elem.name.as_ref().unwrap_or(&"".to_string()), &elem.value)?;
+                        &elem.name.as_ref().unwrap_or(&"".to_string()),
+                        &elem.value,
+                    )?;
                 }
                 map.end()
             }
@@ -341,7 +345,7 @@ impl Serialize1 for BqValue {
                 }
                 seq.end()
             }
-            BqValue::BqNull => serializer.serialize_none()
+            BqValue::BqNull => serializer.serialize_none(),
         }
     }
 }
@@ -355,7 +359,7 @@ impl string::ToString for BqValue {
             BqValue::BqBool(b) => format!("{}", b),
             BqValue::BqTimestamp(t) => format!("\"{}\"", t),
             BqValue::BqStruct(rs) => {
-                let rs_str = rs
+                let rs_str = rs.columns
                     .iter()
                     .map(|r| r.to_string())
                     .filter(|v| 0 < v.len())
@@ -535,7 +539,8 @@ impl Bq {
             let empty: Vec<TableRow> = vec![];
             let rows = res.1.rows.as_ref().unwrap_or(&empty);
             //println!("{:?}", res);
-            let mut tmp_rows: Vec<BqRow> = tres.1
+            let mut tmp_rows: Vec<BqRow> = tres
+                .1
                 .schema
                 .as_ref()
                 .map(|schema| {
@@ -557,7 +562,7 @@ impl Bq {
                                             .collect(),
                                         None => vec![],
                                     };
-                                    BqRow { columns }
+                                    BqRow::new(columns)
                                 })
                                 .collect()
                         })

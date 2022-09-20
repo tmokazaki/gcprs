@@ -1,6 +1,6 @@
 use crate::auth;
-use google_storage1 as gcs;
 use gcs::Storage;
+use google_storage1 as gcs;
 use hyper;
 use hyper_rustls;
 use urlencoding;

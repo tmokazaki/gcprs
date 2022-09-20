@@ -1,12 +1,12 @@
 use anyhow::Result;
 use hyper;
 use hyper_rustls;
-use yup_oauth2 as oauth2;
 use oauth2::authenticator::Authenticator;
 use oauth2::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowDelegate};
 use std::env;
 use std::future::Future;
 use std::pin::Pin;
+use yup_oauth2 as oauth2;
 
 #[derive(Clone)]
 pub struct GcpAuth {
