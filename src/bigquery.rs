@@ -1,5 +1,5 @@
 use crate::auth;
-use bigquery::api::{Content, TableCell, TableSchema, TableRow, TableFieldSchema, QueryRequest};
+use bigquery::api::{Content, QueryRequest, TableCell, TableFieldSchema, TableRow, TableSchema};
 use bigquery::{hyper, hyper_rustls, Bigquery};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
@@ -10,8 +10,8 @@ use async_recursion::async_recursion;
 use rayon::prelude::*;
 use serde::ser::{Serialize as Serialize1, SerializeMap, SerializeSeq, Serializer};
 use serde::Deserialize;
-use std::string;
 use std::collections::HashMap;
+use std::string;
 
 pub struct Bq {
     api: Bigquery<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
@@ -47,7 +47,7 @@ impl BqListParam {
 pub struct BqGetQueryResultParam {
     job_id: String,
     page_token: String,
-    max_results: u32,
+    _max_results: u32,
 }
 
 impl BqGetQueryResultParam {
@@ -55,8 +55,13 @@ impl BqGetQueryResultParam {
         BqGetQueryResultParam {
             job_id: job_id.to_owned(),
             page_token: page_token.to_owned(),
-            max_results: 1000
+            _max_results: 1000,
         }
+    }
+
+    pub fn max_results(&mut self, max_results: u32) -> &mut Self {
+        self._max_results = max_results;
+        self
     }
 }
 
@@ -194,17 +199,21 @@ pub struct BqRow {
 
 impl BqRow {
     pub fn new(columns: Vec<BqColumn>) -> Self {
-        let name_index: HashMap<String, i32> = HashMap::from_iter(columns
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (c.name.as_ref().unwrap_or(&"".to_string()).clone(), i as i32)));
+        let name_index: HashMap<String, i32> = HashMap::from_iter(
+            columns
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (c.name.as_ref().unwrap_or(&"".to_string()).clone(), i as i32)),
+        );
         BqRow {
             _name_index: name_index,
             columns: columns,
         }
     }
     pub fn get(&self, key: &str) -> Option<&BqValue> {
-        self._name_index.get(key).map(|idx| &self.columns[*idx as usize].value)
+        self._name_index
+            .get(key)
+            .map(|idx| &self.columns[*idx as usize].value)
     }
 
     pub fn len(&self) -> usize {
@@ -411,7 +420,8 @@ impl string::ToString for BqValue {
             BqValue::BqBool(b) => format!("{}", b),
             BqValue::BqTimestamp(t) => format!("\"{}\"", t),
             BqValue::BqStruct(rs) => {
-                let rs_str = rs.columns
+                let rs_str = rs
+                    .columns
                     .iter()
                     .map(|r| r.to_string())
                     .filter(|v| 0 < v.len())
@@ -496,10 +506,7 @@ impl Bq {
                             .as_ref()
                             .unwrap_or(&"".to_string())
                             .to_string();
-                        BqDataset {
-                            dataset,
-                            project,
-                        }
+                        BqDataset { dataset, project }
                     })
                 })
                 .filter_map(|v| v)
@@ -561,34 +568,44 @@ impl Bq {
     }
 
     #[async_recursion]
-    async fn get_query_results(&'async_recursion self,
-        p: &'async_recursion BqGetQueryResultParam
+    async fn get_query_results(
+        &'async_recursion self,
+        p: &'async_recursion BqGetQueryResultParam,
     ) -> Result<Vec<BqRow>> {
-        let api = self.api.jobs().get_query_results(&self.project, &p.job_id)
+        let api = self
+            .api
+            .jobs()
+            .get_query_results(&self.project, &p.job_id)
             .page_token(&p.page_token)
-            .max_results(p.max_results);
+            .max_results(p._max_results);
         let result = api.doit().await?;
         //println!("{:?}", result);
-        let bq_rows: Vec<BqRow> = if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
-            let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
-            if let Some(token) = &result.1.page_token {
-                let param = BqGetQueryResultParam::new(
-                    &result.1.job_reference.map(
-                        |jr| jr.job_id.unwrap_or("".to_string())
-                    )
-                    .unwrap_or("".to_string()), token);
-                tmp_rows.extend(self.get_query_results(&param).await?);
-            }
-            tmp_rows
-        } else {
-            vec![]
-        };
+        let bq_rows: Vec<BqRow> =
+            if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
+                let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
+                if let Some(token) = &result.1.page_token {
+                    let mut param = BqGetQueryResultParam::new(
+                        &result
+                            .1
+                            .job_reference
+                            .map(|jr| jr.job_id.unwrap_or("".to_string()))
+                            .unwrap_or("".to_string()),
+                        token,
+                    );
+                    param.max_results(p._max_results);
+                    tmp_rows.extend(self.get_query_results(&param).await?);
+                }
+                tmp_rows
+            } else {
+                vec![]
+            };
 
         Ok(bq_rows)
     }
 
     fn to_rows(&self, schema: &TableSchema, rows: &Vec<TableRow>) -> Vec<BqRow> {
-        schema.fields
+        schema
+            .fields
             .as_ref()
             .map(|fields| {
                 let schemas: Vec<BqTableSchema> = fields
@@ -608,7 +625,8 @@ impl Bq {
                         BqRow::new(columns)
                     })
                     .collect()
-        }).unwrap_or(vec![])
+            })
+            .unwrap_or(vec![])
     }
 
     #[async_recursion]
@@ -620,20 +638,25 @@ impl Bq {
         let query_api = self.api.jobs().query(req, &self.project);
         let result = query_api.doit().await?;
         //println!("{:?}", result);
-        let bq_rows: Vec<BqRow> = if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
-            let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
-            if let Some(token) = &result.1.page_token {
-                let param = BqGetQueryResultParam::new(
-                    &result.1.job_reference.map(
-                        |jr| jr.job_id.unwrap_or("".to_string())
-                    )
-                    .unwrap_or("".to_string()), token);
-                tmp_rows.extend(self.get_query_results(&param).await?);
-            }
-            tmp_rows
-        } else {
-            vec![]
-        };
+        let bq_rows: Vec<BqRow> =
+            if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
+                let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
+                if let Some(token) = &result.1.page_token {
+                    let mut param = BqGetQueryResultParam::new(
+                        &result
+                            .1
+                            .job_reference
+                            .map(|jr| jr.job_id.unwrap_or("".to_string()))
+                            .unwrap_or("".to_string()),
+                        token,
+                    );
+                    param.max_results(p._max_results);
+                    tmp_rows.extend(self.get_query_results(&param).await?);
+                }
+                tmp_rows
+            } else {
+                vec![]
+            };
         Ok(bq_rows)
     }
 
@@ -672,9 +695,7 @@ impl Bq {
                 .1
                 .schema
                 .as_ref()
-                .map(|schema| {
-                    self.to_rows(schema, rows)
-                })
+                .map(|schema| self.to_rows(schema, rows))
                 .unwrap_or(vec![]);
             if let Some(token) = &res.1.page_token {
                 let mut param = p.clone();
