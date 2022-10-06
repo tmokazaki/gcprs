@@ -1,6 +1,6 @@
 use crate::auth;
 use bigquery::api::{Content, QueryRequest, TableCell, TableFieldSchema, TableRow, TableSchema};
-use bigquery::{hyper, hyper_rustls, Bigquery};
+use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
 
@@ -18,8 +18,12 @@ type DatasetId = String;
 type TableId = String;
 
 pub struct Bq {
+    /// BigQuery API endpoint
     api: Bigquery<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+
+    /// GCP Project ID
     project: ProjectId,
+    max_data: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -200,7 +204,10 @@ enum BqType {
 
 #[derive(Debug, Deserialize)]
 pub struct BqRow {
+    /// To keep column order
     _name_index: HashMap<String, i32>,
+
+    /// Actual columns
     columns: Vec<BqColumn>,
 }
 
@@ -478,7 +485,13 @@ impl Bq {
         Ok(Bq {
             api: hub,
             project: project.to_string(),
+            max_data: 10,
         })
+    }
+
+    pub fn max_data(&mut self, max_data: usize) -> &mut Self {
+        self.max_data = max_data;
+        self
     }
 
     #[async_recursion]
@@ -497,37 +510,42 @@ impl Bq {
             "fields",
             "datasets/id, datasets/datasetReference, nextPageToken",
         );
-        let result = list_api.doit().await?;
-        let mut dss: Vec<BqDataset> = match result.1.datasets {
-            Some(ds) => ds
-                .par_iter()
-                .map(|d| {
-                    d.dataset_reference.as_ref().map(|dr| {
-                        let dataset = dr
-                            .dataset_id
-                            .as_ref()
-                            .unwrap_or(&"".to_string())
-                            .to_string();
-                        let project = dr
-                            .project_id
-                            .as_ref()
-                            .unwrap_or(&"".to_string())
-                            .to_string();
-                        BqDataset { dataset, project }
-                    })
-                })
-                .filter_map(|v| v)
-                .collect(),
-            None => vec![],
-        };
-        if let Some(token) = result.1.next_page_token {
-            let mut param = p.clone();
-            param.page_token(&token);
-            let additionals = self.list_dataset(&param).await?;
-            dss.extend(additionals);
-        };
+        let res = list_api.doit().await;
+        match self.handle_error(res) {
+            Ok(result) => {
+                let mut dss: Vec<BqDataset> = match result.1.datasets {
+                    Some(ds) => ds
+                        .par_iter()
+                        .map(|d| {
+                            d.dataset_reference.as_ref().map(|dr| {
+                                let dataset = dr
+                                    .dataset_id
+                                    .as_ref()
+                                    .unwrap_or(&"".to_string())
+                                    .to_string();
+                                let project = dr
+                                    .project_id
+                                    .as_ref()
+                                    .unwrap_or(&"".to_string())
+                                    .to_string();
+                                BqDataset { dataset, project }
+                            })
+                        })
+                        .filter_map(|v| v)
+                        .collect(),
+                    None => vec![],
+                };
+                if let Some(token) = result.1.next_page_token {
+                    let mut param = p.clone();
+                    param.page_token(&token);
+                    let additionals = self.list_dataset(&param).await?;
+                    dss.extend(additionals);
+                };
 
-        Ok(dss)
+                Ok(dss)
+            }
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        }
     }
 
     pub async fn get_table_schema(
@@ -536,22 +554,27 @@ impl Bq {
         table: &TableId,
     ) -> Result<Vec<BqTableSchema>> {
         let api = self.api.tables().get(&self.project, &dataset, table);
-        let result = api.doit().await?;
-        let schemas = if let Some(schema) = result.1.schema {
-            self.to_schemas(&schema)
-        } else {
-            vec![]
-        };
-        Ok(schemas)
+        let res = api.doit().await;
+        match self.handle_error(res) {
+            Ok(result) => {
+                let schemas = if let Some(schema) = result.1.schema {
+                    self.to_schemas(&schema)
+                } else {
+                    vec![]
+                };
+                Ok(schemas)
+            }
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        }
     }
 
     #[async_recursion]
     pub async fn list_tables(
         &'async_recursion self,
-        ds: &'async_recursion BqDataset,
+        dataset: &'async_recursion DatasetId,
         p: &'async_recursion BqListParam,
     ) -> Result<Vec<BqTable>> {
-        let mut list_api = self.api.tables().list(&ds.project, &ds.dataset);
+        let mut list_api = self.api.tables().list(&self.project, &dataset);
         if let Some(max_results) = p._max_results {
             list_api = list_api.max_results(max_results);
         }
@@ -560,34 +583,40 @@ impl Bq {
         }
         list_api = list_api.param("fields",
             "tables/id, tables/tableReference, tables/creationTime, tables/expirationTime, nextPageToken, totalItems");
-        let result = list_api.doit().await?;
+        let res = list_api.doit().await;
         //println!("{:?}", result);
-        let mut tables: Vec<BqTable> = match result.1.tables {
-            Some(ts) => ts
-                .par_iter()
-                .map(|t| {
-                    t.table_reference.as_ref().map(|tr| {
-                        let table_id = tr.table_id.as_ref().unwrap_or(&"".to_string()).to_string();
-                        BqTable {
-                            dataset: ds.clone(),
-                            table_id,
-                            created_at: None,
-                            expired_at: None,
-                        }
-                    })
-                })
-                .filter_map(|v| v)
-                .collect(),
-            None => vec![],
-        };
-        if let Some(token) = result.1.next_page_token {
-            let mut param = p.clone();
-            param.page_token(&token);
-            let additionals = self.list_tables(ds, &param).await?;
-            tables.extend(additionals);
-        };
+        match self.handle_error(res) {
+            Ok(result) => {
+                let mut tables: Vec<BqTable> = match result.1.tables {
+                    Some(ts) => ts
+                        .par_iter()
+                        .map(|t| {
+                            t.table_reference.as_ref().map(|tr| {
+                                let table_id =
+                                    tr.table_id.as_ref().unwrap_or(&"".to_string()).to_string();
+                                BqTable {
+                                    dataset: BqDataset::new(&self.project, dataset),
+                                    table_id,
+                                    created_at: None,
+                                    expired_at: None,
+                                }
+                            })
+                        })
+                        .filter_map(|v| v)
+                        .collect(),
+                    None => vec![],
+                };
+                if let Some(token) = result.1.next_page_token {
+                    let mut param = p.clone();
+                    param.page_token(&token);
+                    let additionals = self.list_tables(dataset, &param).await?;
+                    tables.extend(additionals);
+                };
 
-        Ok(tables)
+                Ok(tables)
+            }
+            Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
+        }
     }
 
     #[async_recursion]
@@ -601,7 +630,7 @@ impl Bq {
             .get_query_results(&self.project, &p.job_id)
             .page_token(&p.page_token)
             .max_results(p._max_results);
-        let resp = api.doit().await;
+        let resp = self.handle_error(api.doit().await);
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
@@ -627,11 +656,7 @@ impl Bq {
 
                 Ok(bq_rows)
             }
-            Err(e) => {
-                // TODO: error handling
-                println!("{}", e);
-                Err(anyhow::anyhow!(format!("{}", e)))
-            }
+            Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
         }
     }
 
@@ -681,10 +706,12 @@ impl Bq {
     ) -> Result<Vec<BqRow>> {
         let req = p.to_query_request();
         let query_api = self.api.jobs().query(req, &self.project);
-        let resp = query_api.doit().await;
-        //println!("{:?}", resp);
+        let resp = self.handle_error(query_api.doit().await);
         match resp {
             Ok(result) => {
+                //println!("{:?}", result);
+                // TODO: should return total rows for local memory
+                //let total_rows = result.1.total_rows.map(|n| n.parse().unwrap_or(-1)).unwrap_or(-1);
                 let bq_rows: Vec<BqRow> =
                     if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
                         let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
@@ -710,11 +737,28 @@ impl Bq {
                     };
                 Ok(bq_rows)
             }
-            Err(e) => {
-                // TODO: error handling
-                println!("{}", e);
-                Err(anyhow::anyhow!(format!("{}", e)))
-            }
+            Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
+        }
+    }
+
+    fn handle_error<T>(&self, result: GcpResult<T>) -> Result<T> {
+        match result {
+            Err(e) => match e {
+                Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::BadRequest(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    Err(anyhow::anyhow!("{}", e))
+                }
+            },
+            Ok(res) => Ok(res),
         }
     }
 
@@ -745,8 +789,12 @@ impl Bq {
         let (table_result, result) = tokio::join!(table_result_future, result_future);
         //println!("{:?}", table_result);
         //println!("{:?}", result);
-        let bq_rows: Vec<BqRow> = if let (Ok(tres), Ok(res)) = (&table_result, &result) {
+        let bq_rows: Vec<BqRow> = if let (Ok(tres), Ok(res)) =
+            (self.handle_error(table_result), self.handle_error(result))
+        {
             let empty: Vec<TableRow> = vec![];
+            // TODO: should return total rows for local memory
+            //let total_rows = res.1.total_rows.map(|n| n.parse().unwrap_or(-1)).unwrap_or(-1);
             let rows = res.1.rows.as_ref().unwrap_or(&empty);
             //println!("{:?}", res);
             let mut tmp_rows: Vec<BqRow> = tres
