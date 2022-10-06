@@ -4,8 +4,10 @@ use anyhow::Result;
 use bigquery::{Bq, BqListParam, BqQueryParam, BqTable};
 use clap::{Args, Parser, Subcommand};
 use gcprs::auth;
+use json_to_table::{json_to_table, Orientation};
 use std::env;
 use std::process;
+use tabled::Style;
 
 #[derive(Debug, Subcommand)]
 enum SubCommand {
@@ -18,13 +20,17 @@ struct BqArgs {
     #[clap(short = 'p', long = "project")]
     project: Option<String>,
 
+    /// Output raw JSON
+    #[clap(short = 'r', long = "raw_json", default_value = "false")]
+    raw: bool,
+
     #[clap(subcommand)]
     bq_sub_command: BqSubCommand,
 }
 
 #[derive(Default, Debug, Args)]
 struct ListTableDataArgs {
-    #[clap(short = 'm', long = "max_results", default_value = "10")]
+    #[clap(short = 'm', long = "max_results", default_value = "1000")]
     max_results: u32,
 
     /// Dataset ID
@@ -74,11 +80,27 @@ struct Arguments {
     command: SubCommand,
 }
 
+fn render(json_str: String, raw_json: bool) -> Result<()> {
+    if raw_json {
+        println!("{}", json_str)
+    } else {
+        let json_value = serde_json::from_str(&json_str)?;
+        println!(
+            "{}",
+            json_to_table(&json_value)
+                .set_style(Style::markdown())
+                //        .set_object_mode(Orientation::Horizontal)
+                .to_string()
+        );
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Arguments::parse();
+    let main_args = Arguments::parse();
     //println!("{:?}", args);
-    match args.command {
+    match main_args.command {
         SubCommand::Bq(bqargs) => {
             let project = if let Some(project) = bqargs.project {
                 project
@@ -100,22 +122,24 @@ async fn main() -> Result<()> {
                     list_params.max_results(args.max_results);
                     let table = BqTable::new(&project, &args.dataset, &args.table);
                     let data = bigquery.list_tabledata(&table, &list_params).await?;
-                    println!("{}", serde_json::to_string(&data).unwrap());
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
                 }
                 BqSubCommand::Query(args) => {
                     let mut query_params = BqQueryParam::new(&args.query);
                     query_params.max_results(args.max_results);
                     let data = bigquery.query(&query_params).await?;
-                    println!("{}", serde_json::to_string(&data).unwrap());
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
                 }
                 BqSubCommand::TableSchema(args) => {
                     let data = bigquery
                         .get_table_schema(&args.dataset, &args.table)
                         .await?;
-                    println!("{}", serde_json::to_string(&data).unwrap());
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
                 }
             }
         }
     }
-    Ok(())
 }

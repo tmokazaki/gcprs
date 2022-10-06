@@ -1,4 +1,5 @@
 [package]
+author = "Tomohiko OKAZAKI"
 name = "gcprs"
 version = "0.1.0"
 edition = "2021"
@@ -12,19 +13,24 @@ itertools = "0.10.3"
 ndarray = "0.15.0"
 async-recursion = "0.2"
 chrono = { version = "0.4", features = ["serde"] }
-anyhow = { version = "1.0", features = ["backtrace"] }
+anyhow = { version = "^1.0", features = ["backtrace"] }
 hyper = "^0.14"
 hyper-rustls = "^0.23.0"
 yup-oauth2 = "^7.0"
 rayon = "^1.5"
 urlencoding = "1.0.0"
 webbrowser = "0.5"
-clap = { version = "^4", features = ["derive"] }
-
 tokio = { version = "^1.0", features = ["full"] }
 
+# for CLI
+clap = { version = "^4", features = ["derive"] }
+
+tabled = { version = "*" }
+json_to_table = "*"
+
+
 google-storage1 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
-google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", rev = "ac0d3ab7849b71133703e534e6528a4757aebfef" }
+google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "schema_mode_support" }
 google-sheets4 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
 
 [dev-dependencies]
