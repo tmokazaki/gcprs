@@ -1,4 +1,4 @@
-mod bigquery;
+use gcprs::bigquery;
 use anyhow;
 use anyhow::Result;
 use bigquery::{Bq, BqListParam, BqQueryParam, BqTable};
@@ -54,6 +54,13 @@ struct TableSchemaArgs {
 }
 
 #[derive(Default, Debug, Args)]
+struct ListTablesArgs {
+    /// Dataset ID
+    #[clap(short = 'd', long = "dataset")]
+    dataset: String,
+}
+
+#[derive(Default, Debug, Args)]
 struct QueryArgs {
     /// Maximum result of API result
     #[clap(short = 'm', long = "max_results", default_value = "1000")]
@@ -66,6 +73,10 @@ struct QueryArgs {
 
 #[derive(Debug, Subcommand)]
 enum BqSubCommand {
+    /// Show Dataset JSON
+    ListDataset,
+    /// Show Table list JSON
+    ListTables(ListTablesArgs),
     /// Show Table Schema JSON
     TableSchema(TableSchemaArgs),
     /// Show Table Data as JSON format
@@ -89,7 +100,7 @@ fn render(json_str: String, raw_json: bool) -> Result<()> {
             "{}",
             json_to_table(&json_value)
                 .set_style(Style::markdown())
-                //        .set_object_mode(Orientation::Horizontal)
+                .set_object_mode(Orientation::Horizontal)
                 .to_string()
         );
     }
@@ -117,6 +128,18 @@ async fn main() -> Result<()> {
             let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
             let bigquery = Bq::new(spauth, &project).unwrap();
             match bqargs.bq_sub_command {
+                BqSubCommand::ListDataset => {
+                    let list_params = BqListParam::new();
+                    let data = bigquery.list_dataset(&list_params).await?;
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
+                },
+                BqSubCommand::ListTables(args) => {
+                    let list_params = BqListParam::new();
+                    let data = bigquery.list_tables(&args.dataset, &list_params).await?;
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
+                },
                 BqSubCommand::ListTableData(args) => {
                     let mut list_params = BqListParam::new();
                     list_params.max_results(args.max_results);

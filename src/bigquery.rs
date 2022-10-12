@@ -108,7 +108,7 @@ impl BqQueryParam {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BqDataset {
     dataset: DatasetId,
     project: ProjectId,
@@ -124,7 +124,7 @@ impl BqDataset {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BqTable {
     dataset: BqDataset,
     table_id: TableId,
