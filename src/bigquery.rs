@@ -587,6 +587,9 @@ impl Bq {
         }
     }
 
+    /// Call tables.list API
+    ///
+    /// This will return only table id(project id and dataset id) and timestamp for now.
     #[async_recursion]
     pub async fn list_tables(
         &'async_recursion self,
@@ -603,7 +606,7 @@ impl Bq {
         list_api = list_api.param("fields",
             "tables/id, tables/tableReference, tables/creationTime, tables/expirationTime, nextPageToken, totalItems");
         let res = list_api.doit().await;
-        //println!("{:?}", result);
+        //println!("{:?}", res);
         match self.handle_error(res) {
             Ok(result) => {
                 let mut tables: Vec<BqTable> = match result.1.tables {
@@ -616,8 +619,8 @@ impl Bq {
                                 BqTable {
                                     dataset: BqDataset::new(&self.project, dataset),
                                     table_id,
-                                    created_at: None,
-                                    expired_at: None,
+                                    created_at: t.creation_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
+                                    expired_at: t.expiration_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
                                 }
                             })
                         })
@@ -793,6 +796,9 @@ impl Bq {
         }
     }
 
+    /// Call list_tabledata API.
+    ///
+    /// Notice: This will return whole table data.
     #[async_recursion]
     pub async fn list_tabledata(
         &'async_recursion self,
