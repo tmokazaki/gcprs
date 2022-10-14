@@ -1,9 +1,9 @@
-use gcprs::bigquery;
 use anyhow;
 use anyhow::Result;
 use bigquery::{Bq, BqListParam, BqQueryParam, BqTable};
 use clap::{Args, Parser, Subcommand};
 use gcprs::auth;
+use gcprs::bigquery;
 use json_to_table::{json_to_table, Orientation};
 use std::env;
 use std::process;
@@ -65,6 +65,10 @@ struct QueryArgs {
     /// Maximum result of API result
     #[clap(short = 'm', long = "max_results", default_value = "1000")]
     max_results: u32,
+
+    /// Dry run execution.
+    #[clap(short = 'd', long = "dry_run")]
+    dry_run: bool,
 
     /// Query String
     #[clap(short = 'q', long = "query")]
@@ -133,13 +137,13 @@ async fn main() -> Result<()> {
                     let data = bigquery.list_dataset(&list_params).await?;
                     let json_str = serde_json::to_string(&data)?;
                     render(json_str, bqargs.raw)
-                },
+                }
                 BqSubCommand::ListTables(args) => {
                     let list_params = BqListParam::new();
                     let data = bigquery.list_tables(&args.dataset, &list_params).await?;
                     let json_str = serde_json::to_string(&data)?;
                     render(json_str, bqargs.raw)
-                },
+                }
                 BqSubCommand::ListTableData(args) => {
                     let mut list_params = BqListParam::new();
                     list_params.max_results(args.max_results);
@@ -151,6 +155,7 @@ async fn main() -> Result<()> {
                 BqSubCommand::Query(args) => {
                     let mut query_params = BqQueryParam::new(&args.query);
                     query_params.max_results(args.max_results);
+                    query_params.dry_run(args.dry_run);
                     let data = bigquery.query(&query_params).await?;
                     let json_str = serde_json::to_string(&data)?;
                     render(json_str, bqargs.raw)

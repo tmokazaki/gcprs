@@ -78,6 +78,7 @@ pub struct BqQueryParam {
     _query: String,
     _use_legacy_sql: bool,
     _max_results: u32,
+    _dry_ryn: bool,
 }
 
 impl BqQueryParam {
@@ -86,6 +87,7 @@ impl BqQueryParam {
             _query: query.to_owned(),
             _use_legacy_sql: false,
             _max_results: 1000,
+            _dry_ryn: false,
         }
     }
 
@@ -99,11 +101,17 @@ impl BqQueryParam {
         self
     }
 
+    pub fn dry_run(&mut self, dry_run: bool) -> &mut Self {
+        self._dry_ryn = dry_run;
+        self
+    }
+
     fn to_query_request(&self) -> QueryRequest {
         let mut req = QueryRequest::default();
         req.query = Some(self._query.clone());
         req.max_results = Some(self._max_results);
         req.use_legacy_sql = Some(self._use_legacy_sql);
+        req.dry_run = Some(self._dry_ryn);
         req
     }
 }
@@ -392,6 +400,15 @@ pub enum BqValue {
     BqNull,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Deserialize, Serialize)]
+pub enum QueryResult {
+    #[serde(rename = "schema")]
+    Schema(Vec<BqTableSchema>),
+    #[serde(rename = "data")]
+    Data(Vec<BqRow>),
+}
+
 impl Serialize1 for BqValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -494,6 +511,8 @@ impl Bq {
         self
     }
 
+    /// call list_dataset API.
+    /// this will return list of dataset.
     #[async_recursion]
     pub async fn list_dataset(
         &'async_recursion self,
@@ -699,43 +718,55 @@ impl Bq {
             .unwrap_or(vec![])
     }
 
+    /// Execute query.
+    ///
+    /// If 'dry_run' parameter is set, result would be the result table schema.
     #[async_recursion]
     pub async fn query(
         &'async_recursion self,
         p: &'async_recursion BqQueryParam,
-    ) -> Result<Vec<BqRow>> {
+    ) -> Result<QueryResult> {
         let req = p.to_query_request();
         let query_api = self.api.jobs().query(req, &self.project);
         let resp = self.handle_error(query_api.doit().await);
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
-                // TODO: should return total rows for local memory
-                //let total_rows = result.1.total_rows.map(|n| n.parse().unwrap_or(-1)).unwrap_or(-1);
-                let bq_rows: Vec<BqRow> =
-                    if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
-                        let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
-                        if let Some(token) = &result.1.page_token {
-                            let mut param = BqGetQueryResultParam::new(
-                                &result
-                                    .1
-                                    .job_reference
-                                    .map(|jr| jr.job_id.unwrap_or("".to_string()))
-                                    .unwrap_or("".to_string()),
-                                token,
-                            );
-                            param.max_results(p._max_results);
-                            let resp = self.get_query_results(&param).await;
-                            match resp {
-                                Ok(result) => tmp_rows.extend(result),
-                                _ => println!("{:?}", resp),
-                            }
-                        }
-                        tmp_rows
+                if p._dry_ryn {
+                    let schemas = if let Some(schema) = result.1.schema {
+                        self.to_schemas(&schema)
                     } else {
                         vec![]
                     };
-                Ok(bq_rows)
+                    Ok(QueryResult::Schema(schemas))
+                } else {
+                    // TODO: should return total rows for local memory
+                    //let total_rows = result.1.total_rows.map(|n| n.parse().unwrap_or(-1)).unwrap_or(-1);
+                    let bq_rows: Vec<BqRow> =
+                        if let (Some(schema), Some(rows)) = (result.1.schema, result.1.rows) {
+                            let mut tmp_rows: Vec<BqRow> = self.to_rows(&schema, &rows);
+                            if let Some(token) = &result.1.page_token {
+                                let mut param = BqGetQueryResultParam::new(
+                                    &result
+                                        .1
+                                        .job_reference
+                                        .map(|jr| jr.job_id.unwrap_or("".to_string()))
+                                        .unwrap_or("".to_string()),
+                                    token,
+                                );
+                                param.max_results(p._max_results);
+                                let resp = self.get_query_results(&param).await;
+                                match resp {
+                                    Ok(result) => tmp_rows.extend(result),
+                                    _ => println!("{:?}", resp),
+                                }
+                            }
+                            tmp_rows
+                        } else {
+                            vec![]
+                        };
+                    Ok(QueryResult::Data(bq_rows))
+                }
             }
             Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
         }
