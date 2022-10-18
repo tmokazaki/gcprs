@@ -77,6 +77,8 @@ struct QueryArgs {
 
 #[derive(Debug, Subcommand)]
 enum BqSubCommand {
+    /// Show Project JSON
+    ListProject,
     /// Show Dataset JSON
     ListDataset,
     /// Show Table list JSON
@@ -130,21 +132,28 @@ async fn main() -> Result<()> {
             };
 
             let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
-            let bigquery = Bq::new(spauth, &project).unwrap();
             match bqargs.bq_sub_command {
+                BqSubCommand::ListProject => {
+                    let data = Bq::list_project(spauth).await?;
+                    let json_str = serde_json::to_string(&data)?;
+                    render(json_str, bqargs.raw)
+                },
                 BqSubCommand::ListDataset => {
+                    let bigquery = Bq::new(spauth, &project).unwrap();
                     let list_params = BqListParam::new();
                     let data = bigquery.list_dataset(&list_params).await?;
                     let json_str = serde_json::to_string(&data)?;
                     render(json_str, bqargs.raw)
                 }
                 BqSubCommand::ListTables(args) => {
+                    let bigquery = Bq::new(spauth, &project).unwrap();
                     let list_params = BqListParam::new();
                     let data = bigquery.list_tables(&args.dataset, &list_params).await?;
                     let json_str = serde_json::to_string(&data)?;
                     render(json_str, bqargs.raw)
                 }
                 BqSubCommand::ListTableData(args) => {
+                    let bigquery = Bq::new(spauth, &project).unwrap();
                     let mut list_params = BqListParam::new();
                     list_params.max_results(args.max_results);
                     let table = BqTable::new(&project, &args.dataset, &args.table);
@@ -153,6 +162,7 @@ async fn main() -> Result<()> {
                     render(json_str, bqargs.raw)
                 }
                 BqSubCommand::Query(args) => {
+                    let bigquery = Bq::new(spauth, &project).unwrap();
                     let mut query_params = BqQueryParam::new(&args.query);
                     query_params.max_results(args.max_results);
                     query_params.dry_run(args.dry_run);
@@ -161,6 +171,7 @@ async fn main() -> Result<()> {
                     render(json_str, bqargs.raw)
                 }
                 BqSubCommand::TableSchema(args) => {
+                    let bigquery = Bq::new(spauth, &project).unwrap();
                     let data = bigquery
                         .get_table_schema(&args.dataset, &args.table)
                         .await?;

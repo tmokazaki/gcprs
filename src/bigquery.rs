@@ -26,6 +26,13 @@ pub struct Bq {
     max_data: usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BqProject {
+    pub friendly_name: String,
+    pub id: String,
+    pub numeric_id: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct BqListParam {
     _max_results: Option<u32>,
@@ -489,6 +496,7 @@ impl BqTable {
 }
 
 impl Bq {
+
     pub fn new(auth: auth::GcpAuth, project: &str) -> Result<Bq> {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
@@ -511,6 +519,39 @@ impl Bq {
         self
     }
 
+    pub async fn list_project(auth: auth::GcpAuth) -> Result<Vec<BqProject>> {
+        let client = hyper::Client::builder().build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .https_only()
+                .enable_http1()
+                .enable_http2()
+                .build(),
+        );
+        let hub = Bigquery::new(client, auth.authenticator());
+        // TODO: handle nex_page_token
+        let res = hub.projects().list().doit().await;
+        match Bq::handle_error(res) {
+            Ok(result) => {
+                let mut pss: Vec<BqProject> = match result.1.projects {
+                    Some(ps) => ps
+                        .par_iter()
+                        .map(|p| {
+                            BqProject {
+                                friendly_name: p.friendly_name.as_ref().unwrap().clone(),
+                                id: p.id.as_ref().unwrap().clone(),
+                                numeric_id: p.numeric_id.as_ref().unwrap().clone(),
+                            }
+                        })
+                        .collect(),
+                    None => vec![]
+                };
+                Ok(pss)
+            },
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        }
+    }
+
     /// call list_dataset API.
     /// this will return list of dataset.
     #[async_recursion]
@@ -530,7 +571,7 @@ impl Bq {
             "datasets/id, datasets/datasetReference, nextPageToken",
         );
         let res = list_api.doit().await;
-        match self.handle_error(res) {
+        match Bq::handle_error(res) {
             Ok(result) => {
                 let mut dss: Vec<BqDataset> = match result.1.datasets {
                     Some(ds) => ds
@@ -574,7 +615,7 @@ impl Bq {
     ) -> Result<Vec<BqTableSchema>> {
         let api = self.api.tables().get(&self.project, &dataset, table);
         let res = api.doit().await;
-        match self.handle_error(res) {
+        match Bq::handle_error(res) {
             Ok(result) => {
                 let schemas = if let Some(schema) = result.1.schema {
                     self.to_schemas(&schema)
@@ -607,7 +648,7 @@ impl Bq {
             "tables/id, tables/tableReference, tables/creationTime, tables/expirationTime, nextPageToken, totalItems");
         let res = list_api.doit().await;
         //println!("{:?}", res);
-        match self.handle_error(res) {
+        match Bq::handle_error(res) {
             Ok(result) => {
                 let mut tables: Vec<BqTable> = match result.1.tables {
                     Some(ts) => ts
@@ -652,7 +693,7 @@ impl Bq {
             .get_query_results(&self.project, &p.job_id)
             .page_token(&p.page_token)
             .max_results(p._max_results);
-        let resp = self.handle_error(api.doit().await);
+        let resp = Bq::handle_error(api.doit().await);
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
@@ -731,7 +772,7 @@ impl Bq {
     ) -> Result<QueryResult> {
         let req = p.to_query_request();
         let query_api = self.api.jobs().query(req, &self.project);
-        let resp = self.handle_error(query_api.doit().await);
+        let resp = Bq::handle_error(query_api.doit().await);
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
@@ -775,7 +816,7 @@ impl Bq {
         }
     }
 
-    fn handle_error<T>(&self, result: GcpResult<T>) -> Result<T> {
+    fn handle_error<T>(result: GcpResult<T>) -> Result<T> {
         match result {
             Err(e) => match e {
                 Error::HttpError(_)
@@ -827,7 +868,7 @@ impl Bq {
         //println!("{:?}", table_result);
         //println!("{:?}", result);
         let bq_rows: Vec<BqRow> = if let (Ok(tres), Ok(res)) =
-            (self.handle_error(table_result), self.handle_error(result))
+            (Bq::handle_error(table_result), Bq::handle_error(result))
         {
             let empty: Vec<TableRow> = vec![];
             // TODO: should return total rows for local memory
