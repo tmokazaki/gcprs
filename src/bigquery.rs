@@ -496,7 +496,6 @@ impl BqTable {
 }
 
 impl Bq {
-
     pub fn new(auth: auth::GcpAuth, project: &str) -> Result<Bq> {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
@@ -536,18 +535,16 @@ impl Bq {
                 let mut pss: Vec<BqProject> = match result.1.projects {
                     Some(ps) => ps
                         .par_iter()
-                        .map(|p| {
-                            BqProject {
-                                friendly_name: p.friendly_name.as_ref().unwrap().clone(),
-                                id: p.id.as_ref().unwrap().clone(),
-                                numeric_id: p.numeric_id.as_ref().unwrap().clone(),
-                            }
+                        .map(|p| BqProject {
+                            friendly_name: p.friendly_name.as_ref().unwrap().clone(),
+                            id: p.id.as_ref().unwrap().clone(),
+                            numeric_id: p.numeric_id.as_ref().unwrap().clone(),
                         })
                         .collect(),
-                    None => vec![]
+                    None => vec![],
                 };
                 Ok(pss)
-            },
+            }
             Err(e) => Err(anyhow::anyhow!("{}", e)),
         }
     }
@@ -660,8 +657,14 @@ impl Bq {
                                 BqTable {
                                     dataset: BqDataset::new(&self.project, dataset),
                                     table_id,
-                                    created_at: t.creation_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
-                                    expired_at: t.expiration_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
+                                    created_at: t
+                                        .creation_time
+                                        .as_ref()
+                                        .map(|t| t.parse::<u64>().unwrap()),
+                                    expired_at: t
+                                        .expiration_time
+                                        .as_ref()
+                                        .map(|t| t.parse::<u64>().unwrap()),
                                 }
                             })
                         })
