@@ -1,12 +1,13 @@
 use anyhow::Result;
-use bigquery::{Bq, BqListParam, BqQueryParam, BqTable};
+use bigquery::{Bq, BqDataset, BqListParam, BqProject, BqQueryParam, BqRow, BqTable, QueryResult};
 use clap::{Args, Subcommand};
 use gcprs::auth;
 use gcprs::bigquery;
 use json_to_table::{json_to_table, Orientation};
+use serde::Serialize;
 use std::env;
 use std::process;
-use tabled::Style;
+use tabled::{builder::Builder, Style};
 
 #[derive(Debug, Args)]
 pub struct BqArgs {
@@ -85,6 +86,81 @@ pub struct QueryArgs {
     query: String,
 }
 
+trait TableView {
+    fn columns(&self) -> Vec<String>;
+    fn values(&self) -> Vec<String>;
+}
+
+impl TableView for BqProject {
+    fn columns(&self) -> Vec<String> {
+        vec![
+            "friendly_name".to_owned(),
+            "id".to_owned(),
+            "numeric_id".to_owned(),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.friendly_name.clone(),
+            self.id.clone(),
+            self.numeric_id.clone(),
+        ]
+    }
+}
+
+impl TableView for BqDataset {
+    fn columns(&self) -> Vec<String> {
+        vec!["project".to_owned(), "dataset".to_owned()]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![self.project.clone(), self.dataset.clone()]
+    }
+}
+
+impl TableView for BqTable {
+    fn columns(&self) -> Vec<String> {
+        vec![
+            "project".to_owned(),
+            "dataset".to_owned(),
+            "table".to_owned(),
+            "created_at".to_owned(),
+            "expired_at".to_owned(),
+        ]
+    }
+
+    fn values(&self) -> Vec<String> {
+        vec![
+            self.dataset.project.clone(),
+            self.dataset.dataset.clone(),
+            self.table_id.clone(),
+            self.created_at
+                .map(|t| format!("{}", t))
+                .unwrap_or("".to_string()),
+            self.expired_at
+                .map(|t| format!("{}", t))
+                .unwrap_or("".to_string()),
+        ]
+    }
+}
+
+impl TableView for BqRow {
+    fn columns(&self) -> Vec<String> {
+        self.columns()
+            .iter()
+            .map(|c| c.name().unwrap_or("".to_string()))
+            .collect()
+    }
+
+    fn values(&self) -> Vec<String> {
+        self.columns()
+            .iter()
+            .map(|r| serde_json::to_string(r.value()).unwrap())
+            .collect()
+    }
+}
+
 fn render(json_str: String, raw_json: bool) -> Result<()> {
     if raw_json {
         println!("{}", json_str)
@@ -97,6 +173,30 @@ fn render(json_str: String, raw_json: bool) -> Result<()> {
                 .set_object_mode(Orientation::Horizontal)
                 .to_string()
         );
+    }
+    Ok(())
+}
+
+fn render2<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()> {
+    if raw_json {
+        let json_str = serde_json::to_string(&data)?;
+        println!("{}", json_str)
+    } else {
+        let mut builder = Builder::default();
+        let header = if 0 < data.len() {
+            data[0].columns()
+        } else {
+            vec![]
+        };
+        builder.set_columns(header);
+        for pj in data {
+            builder.add_record(pj.values());
+        }
+
+        let mut table = builder.build();
+        table.with(Style::markdown());
+
+        println!("{}", table);
     }
     Ok(())
 }
@@ -118,22 +218,19 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
     match bqargs.bq_sub_command {
         BqSubCommand::ListProject => {
             let data = Bq::list_project(spauth).await?;
-            let json_str = serde_json::to_string(&data)?;
-            render(json_str, bqargs.raw)
+            render2(&data, bqargs.raw)
         }
         BqSubCommand::ListDataset => {
             let bigquery = Bq::new(spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_dataset(&list_params).await?;
-            let json_str = serde_json::to_string(&data)?;
-            render(json_str, bqargs.raw)
+            render2(&data, bqargs.raw)
         }
         BqSubCommand::ListTables(args) => {
             let bigquery = Bq::new(spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_tables(&args.dataset, &list_params).await?;
-            let json_str = serde_json::to_string(&data)?;
-            render(json_str, bqargs.raw)
+            render2(&data, bqargs.raw)
         }
         BqSubCommand::ListTableData(args) => {
             let bigquery = Bq::new(spauth, &project).unwrap();
@@ -141,8 +238,7 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             list_params.max_results(args.max_results);
             let table = BqTable::new(&project, &args.dataset, &args.table);
             let data = bigquery.list_tabledata(&table, &list_params).await?;
-            let json_str = serde_json::to_string(&data)?;
-            render(json_str, bqargs.raw)
+            render2(&data, bqargs.raw)
         }
         BqSubCommand::Query(args) => {
             let bigquery = Bq::new(spauth, &project).unwrap();
@@ -150,8 +246,14 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             query_params.max_results(args.max_results);
             query_params.dry_run(args.dry_run);
             let data = bigquery.query(&query_params).await?;
-            let json_str = serde_json::to_string(&data)?;
-            render(json_str, bqargs.raw)
+
+            match data {
+                QueryResult::Data(ds) => render2(&ds, bqargs.raw),
+                QueryResult::Schema(schemas) => {
+                    let json_str = serde_json::to_string(&schemas)?;
+                    render(json_str, bqargs.raw)
+                }
+            }
         }
         BqSubCommand::TableSchema(args) => {
             let bigquery = Bq::new(spauth, &project).unwrap();

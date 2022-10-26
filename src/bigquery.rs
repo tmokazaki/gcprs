@@ -125,8 +125,8 @@ impl BqQueryParam {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BqDataset {
-    dataset: DatasetId,
-    project: ProjectId,
+    pub dataset: DatasetId,
+    pub project: ProjectId,
 }
 
 impl BqDataset {
@@ -141,10 +141,10 @@ impl BqDataset {
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BqTable {
-    dataset: BqDataset,
-    table_id: TableId,
-    created_at: Option<u64>,
-    expired_at: Option<u64>,
+    pub dataset: BqDataset,
+    pub table_id: TableId,
+    pub created_at: Option<u64>,
+    pub expired_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,6 +205,7 @@ enum BqMode {
     UNKNOWN,
 }
 
+/// BigQuery column type
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 enum BqType {
@@ -243,6 +244,10 @@ impl BqRow {
         self._name_index
             .get(key)
             .map(|idx| &self.columns[*idx as usize].value)
+    }
+
+    pub fn columns(&self) -> &Vec<BqColumn> {
+        &self.columns
     }
 
     pub fn len(&self) -> usize {
@@ -392,6 +397,14 @@ impl BqColumn {
         };
         BqColumn { name, value }
     }
+
+    pub fn name(&self) -> Option<String> {
+        self.name.as_ref().map(|n| n.clone())
+    }
+
+    pub fn value(&self) -> &BqValue {
+        &self.value
+    }
 }
 
 #[allow(dead_code)]
@@ -518,6 +531,8 @@ impl Bq {
         self
     }
 
+    /// call list_project API.
+    /// this will return list of project.
     pub async fn list_project(auth: auth::GcpAuth) -> Result<Vec<BqProject>> {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
