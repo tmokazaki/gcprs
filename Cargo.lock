@@ -196,6 +196,7 @@ dependencies = [
  "serde_json",
  "tabled",
  "tokio",
+ "url 2.3.1",
 ]
 
 [[package]]

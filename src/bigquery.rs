@@ -270,7 +270,9 @@ impl string::ToString for BqRow {
 
 #[derive(Debug, Deserialize)]
 pub struct BqColumn {
+    /// column name
     name: Option<String>,
+    /// value
     value: BqValue,
 }
 
@@ -410,13 +412,21 @@ impl BqColumn {
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub enum BqValue {
+    /// STRING
     BqString(String),
+    /// INTEGER
     BqInteger(i64),
+    /// FLOAT
     BqFloat(f64),
+    /// BOOLEAN
     BqBool(bool),
+    /// TIMESTAMP
     BqTimestamp(DateTime<Utc>),
+    /// STRUCT
     BqStruct(BqRow),
+    /// REPEATED(Array)
     BqRepeated(Vec<Box<BqValue>>),
+    /// NULL
     BqNull,
 }
 

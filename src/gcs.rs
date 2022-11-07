@@ -11,15 +11,21 @@ use anyhow;
 use anyhow::Result;
 use async_recursion::async_recursion;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GcsObject {
+    /// Bucket name
     pub bucket: String,
+    /// Content type
     pub content_type: Option<String>,
+    /// Name of the object
     pub name: Option<String>,
+    /// Size of object
     pub size: Option<u64>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
 }
 
@@ -34,6 +40,15 @@ impl GcsObject {
             updated_at: None,
             content: None,
         }
+    }
+
+    /// Get path of this object
+    pub fn url(&self) -> String {
+        format!(
+            "gs://{}/{}",
+            self.bucket,
+            self.name.as_ref().unwrap_or(&"".to_string())
+        )
     }
 }
 
@@ -61,7 +76,12 @@ impl GcsListParam {
     }
 
     pub fn prefix(&mut self, p: &str) -> &mut Self {
-        self._prefix = Some(p.to_string());
+        // remove only the first slash
+        self._prefix = if p.starts_with("/") {
+            Some(p[1..].to_string())
+        } else {
+            Some(p.to_string())
+        };
         self
     }
 
@@ -82,7 +102,7 @@ impl GcsListParam {
 }
 
 impl Gcs {
-    pub fn new(auth: auth::GcpAuth, bucket: String) -> Result<Gcs> {
+    pub fn new(auth: auth::GcpAuth, bucket: String) -> Gcs {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()
@@ -92,10 +112,10 @@ impl Gcs {
                 .build(),
         );
         let hub = Storage::new(client, auth.authenticator());
-        Ok(Gcs {
+        Gcs {
             api: hub,
             bucket: bucket,
-        })
+        }
     }
 
     #[async_recursion]
