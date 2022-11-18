@@ -25,17 +25,17 @@ pub struct BqArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum BqSubCommand {
-    /// Show Project JSON
+    /// Show available Project list
     ListProject,
-    /// Show Dataset JSON
+    /// Show available Dataset list
     ListDataset,
-    /// Show Table list JSON
+    /// Show available Table list
     ListTables(ListTablesArgs),
     /// Show Table Schema JSON
     TableSchema(TableSchemaArgs),
-    /// Show Table Data as JSON format
+    /// Show Table Data
     ListTableData(ListTableDataArgs),
-    /// Show Query result as JSON format
+    /// Show Query result
     Query(QueryArgs),
 }
 

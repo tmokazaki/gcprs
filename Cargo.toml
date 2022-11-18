@@ -10,13 +10,16 @@ edition = "2021"
 members = [
   "cli",
 ]
+exclude = [
+  "binpacking_web",
+]
 
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
 itertools = "0.10.3"
 ndarray = "0.15.0"
-async-recursion = "0.2"
+async-recursion = "1.0.0"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = { version = "^1.0", features = ["backtrace"] }
 hyper = "^0.14"
