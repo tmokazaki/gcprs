@@ -17,7 +17,7 @@ exclude = [
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
-itertools = "0.10.3"
+itertools = "0.10.5"
 ndarray = "0.15.0"
 async-recursion = "1.0.0"
 chrono = { version = "0.4", features = ["serde"] }
@@ -34,6 +34,7 @@ tokio = { version = "^1.0", features = ["full"] }
 google-storage1 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
 google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "schema_mode_support" }
 google-sheets4 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
+uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [dev-dependencies]
 speculate = "*"

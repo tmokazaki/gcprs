@@ -1,5 +1,8 @@
 use crate::auth;
-use bigquery::api::{Content, QueryRequest, TableCell, TableFieldSchema, TableRow, TableSchema};
+use bigquery::api::{
+    Content, JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
+    TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema
+};
 use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
@@ -10,8 +13,11 @@ use async_recursion::async_recursion;
 use rayon::prelude::*;
 use serde::ser::{Serialize as Serialize1, SerializeMap, SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
-use std::string;
+use std::time::Duration;
+use std::{string, thread};
+use uuid::Uuid;
 
 type ProjectId = String;
 type DatasetId = String;
@@ -138,26 +144,125 @@ impl BqDataset {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct BqCreateTableParam {
+    /// description about the table.
+    description: Option<String>,
+
+    /// Table Schema. You need to implement `BqSchemaBuilder` to set schema in the request.
+    schema: Option<TableSchema>,
+}
+
+impl BqCreateTableParam {
+    pub fn new() -> Self {
+        BqCreateTableParam {
+            description: None,
+            schema: None,
+        }
+    }
+
+    pub fn schema<T: BqSchemaBuilder>(&mut self) -> &mut Self {
+        self.schema = Some(TableSchema {
+            fields: Some(
+                T::bq_schema()
+                    .iter()
+                    .map(|s| s.to_table_field_schema())
+                    .collect(),
+            ),
+        });
+        self
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct BqInsertAllParam {
+    dataset: DatasetId,
+    table: TableId,
+    skip_invalid_rows: bool,
+    ignore_unknown_values: bool,
+    trace_id: Option<String>,
+}
+
+impl BqInsertAllParam {
+    pub fn new(dataset: &str, table: &str) -> Self {
+        BqInsertAllParam {
+            dataset: dataset.to_owned(),
+            table: table.to_owned(),
+            skip_invalid_rows: false,
+            ignore_unknown_values: false,
+            trace_id: None,
+        }
+    }
+
+    pub fn skip_invalid_rows(&mut self, v: bool) -> &mut Self {
+        self.skip_invalid_rows = v;
+        self
+    }
+
+    pub fn ignore_unknown_value(&mut self, v: bool) -> &mut Self {
+        self.ignore_unknown_values = v;
+        self
+    }
+
+    pub fn set_trace_id(&mut self) -> &Option<String> {
+        let uuid = Uuid::new_v4();
+        self.trace_id = Some(uuid.to_string());
+        &self.trace_id
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BqTable {
     pub dataset: BqDataset,
     pub table_id: TableId,
+    pub schemas: Option<Vec<BqTableSchema>>,
     pub created_at: Option<u64>,
     pub expired_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BqTableSchema {
-    name: Option<String>,
+    pub name: Option<String>,
     #[serde(rename = "type")]
-    type_: BqType,
-    mode: BqMode,
-    fields: Box<Vec<BqTableSchema>>,
-    description: Option<String>,
+    pub type_: BqType,
+    pub mode: BqMode,
+    pub fields: Box<Vec<BqTableSchema>>,
+    pub description: Option<String>,
+}
+
+pub trait BqSchemaBuilder {
+    fn bq_schema() -> Vec<BqTableSchema>;
 }
 
 impl BqTableSchema {
+    fn to_table_field_schema(&self) -> TableFieldSchema {
+        let mut schema = TableFieldSchema::default();
+        schema.name = self.name.as_ref().map(|n| n.clone());
+        schema.mode = match self.mode {
+            BqMode::REQUIRED => Some("REQUIRED".to_string()),
+            BqMode::NULLABLE => Some("NULLABLE".to_string()),
+            BqMode::REPEATED => Some("REPEATED".to_string()),
+            _ => None,
+        };
+        schema.type_ = match self.type_ {
+            BqType::STRING => Some("STRING".to_string()),
+            BqType::FLOAT => Some("NUMERIC".to_string()),
+            BqType::INTEGER => Some("INTEGER".to_string()),
+            BqType::BOOLEAN => Some("BOOLEAN".to_string()),
+            BqType::TIMESTAMP => Some("TIMESTAMP".to_string()),
+            BqType::RECORD => Some("RECORD".to_string()),
+            _ => None,
+        };
+        let fields: Vec<TableFieldSchema> = self
+            .fields
+            .iter()
+            .map(|f| f.to_table_field_schema())
+            .collect();
+        schema.fields = if 0 < fields.len() { Some(fields) } else { None };
+        schema
+    }
+
     fn from_table_field_schema(s: &TableFieldSchema) -> Self {
         let name = s.name.as_ref().unwrap_or(&"".to_string()).to_string();
         let type_ = match s.type_.as_ref().unwrap().as_str() {
@@ -198,7 +303,7 @@ impl BqTableSchema {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-enum BqMode {
+pub enum BqMode {
     REQUIRED,
     NULLABLE,
     REPEATED,
@@ -208,7 +313,7 @@ enum BqMode {
 /// BigQuery column type
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-enum BqType {
+pub enum BqType {
     STRING,
     INTEGER,
     FLOAT,
@@ -347,10 +452,11 @@ impl BqColumn {
             BqType::TIMESTAMP => {
                 if let Content::Value(s) = &cell.v {
                     BqValue::BqTimestamp(DateTime::from_utc(
-                        NaiveDateTime::from_timestamp(
+                        NaiveDateTime::from_timestamp_opt(
                             s.parse::<f64>().map(|v| v as i64).unwrap_or(0),
                             0,
-                        ),
+                        )
+                        .unwrap(),
                         Utc,
                     ))
                 } else {
@@ -512,6 +618,7 @@ impl BqTable {
                 dataset: dataset_id.to_owned(),
             },
             table_id: table_id.to_owned(),
+            schemas: Default::default(),
             created_at: Default::default(),
             expired_at: Default::default(),
         }
@@ -557,7 +664,7 @@ impl Bq {
         let res = hub.projects().list().doit().await;
         match Bq::handle_error(res) {
             Ok(result) => {
-                let mut pss: Vec<BqProject> = match result.1.projects {
+                let pss: Vec<BqProject> = match result.1.projects {
                     Some(ps) => ps
                         .par_iter()
                         .map(|p| BqProject {
@@ -576,6 +683,10 @@ impl Bq {
 
     /// call list_dataset API.
     /// this will return list of dataset.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - request parameters
     #[async_recursion]
     pub async fn list_dataset(
         &'async_recursion self,
@@ -630,21 +741,99 @@ impl Bq {
         }
     }
 
-    pub async fn get_table_schema(
-        &self,
-        dataset: &DatasetId,
-        table: &TableId,
-    ) -> Result<Vec<BqTableSchema>> {
+    fn to_bq_table(&self, t: Table) -> BqTable {
+        let default = "".to_string();
+        let schemas = if let Some(schema) = t.schema {
+            self.to_schemas(&schema)
+        } else {
+            vec![]
+        };
+        let (dataset_id, table_id) = t
+            .table_reference
+            .as_ref()
+            .map(|tr| {
+                let dataset_id = tr.dataset_id.as_ref().unwrap_or(&default);
+                let table_id = tr.table_id.as_ref().unwrap_or(&default);
+                (dataset_id, table_id)
+            })
+            .unwrap_or((&default, &default));
+        BqTable {
+            dataset: BqDataset {
+                project: self.project.clone(),
+                dataset: dataset_id.clone(),
+            },
+            table_id: table_id.clone(),
+            schemas: Some(schemas),
+            created_at: t.creation_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
+            expired_at: t
+                .expiration_time
+                .as_ref()
+                .map(|t| t.parse::<u64>().unwrap()),
+        }
+    }
+
+    pub async fn get_table(&self, dataset: &DatasetId, table: &TableId) -> Result<BqTable> {
         let api = self.api.tables().get(&self.project, &dataset, table);
         let res = api.doit().await;
         match Bq::handle_error(res) {
             Ok(result) => {
-                let schemas = if let Some(schema) = result.1.schema {
-                    self.to_schemas(&schema)
-                } else {
-                    vec![]
-                };
-                Ok(schemas)
+                let table = self.to_bq_table(result.1);
+                Ok(table)
+            }
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        }
+    }
+
+    /// Call tables insert API.
+    ///
+    /// # Arguments
+    ///
+    /// * `dataset` - dataset for table
+    /// * `table` - target table name
+    /// * `p` - request parameters
+    pub async fn create_table(
+        &self,
+        dataset: &DatasetId,
+        table: &TableId,
+        p: BqCreateTableParam,
+    ) -> Result<BqTable> {
+        let mut req = Table::default();
+        req.table_reference = Some(TableReference {
+            dataset_id: Some(dataset.clone()),
+            project_id: Some(self.project.clone()),
+            table_id: Some(table.clone()),
+        });
+        if let Some(desc) = p.description {
+            req.description = Some(desc);
+        }
+        if let Some(schema) = p.schema {
+            req.schema = Some(schema);
+        }
+        let api = self.api.tables().insert(req, &self.project, &dataset);
+        let res = api.doit().await;
+        match Bq::handle_error(res) {
+            Ok(result) => {
+                println!("{:?}", result.1);
+                Ok(self.to_bq_table(result.1))
+            }
+            Err(e) => Err(anyhow::anyhow!("{}", e)),
+        }
+    }
+
+    /// Call tables delete API.
+    ///
+    /// # Arguments
+    ///
+    /// * `dataset` - dataset for table
+    /// * `table` - target table name
+    /// * `p` - request parameters
+    pub async fn delete_table(&self, dataset: &DatasetId, table: &TableId) -> Result<()> {
+        let api = self.api.tables().delete(&self.project, &dataset, &table);
+        let res = api.doit().await;
+        match Bq::handle_error(res) {
+            Ok(result) => {
+                println!("{:?}", result);
+                Ok(())
             }
             Err(e) => Err(anyhow::anyhow!("{}", e)),
         }
@@ -676,24 +865,30 @@ impl Bq {
                     Some(ts) => ts
                         .par_iter()
                         .map(|t| {
-                            t.table_reference.as_ref().map(|tr| {
-                                let table_id =
-                                    tr.table_id.as_ref().unwrap_or(&"".to_string()).to_string();
-                                BqTable {
-                                    dataset: BqDataset::new(&self.project, dataset),
-                                    table_id,
-                                    created_at: t
-                                        .creation_time
-                                        .as_ref()
-                                        .map(|t| t.parse::<u64>().unwrap()),
-                                    expired_at: t
-                                        .expiration_time
-                                        .as_ref()
-                                        .map(|t| t.parse::<u64>().unwrap()),
-                                }
-                            })
+                            let default = "".to_string();
+                            let (dataset_id, table_id) = t
+                                .table_reference
+                                .as_ref()
+                                .map(|tr| {
+                                    let dataset_id = tr.dataset_id.as_ref().unwrap_or(&default);
+                                    let table_id = tr.table_id.as_ref().unwrap_or(&default);
+                                    (dataset_id, table_id)
+                                })
+                                .unwrap_or((&default, &default));
+                            BqTable {
+                                dataset: BqDataset::new(&self.project, &dataset_id),
+                                table_id: table_id.to_string(),
+                                schemas: None,
+                                created_at: t
+                                    .creation_time
+                                    .as_ref()
+                                    .map(|t| t.parse::<u64>().unwrap()),
+                                expired_at: t
+                                    .expiration_time
+                                    .as_ref()
+                                    .map(|t| t.parse::<u64>().unwrap()),
+                            }
                         })
-                        .filter_map(|v| v)
                         .collect(),
                     None => vec![],
                 };
@@ -793,6 +988,10 @@ impl Bq {
     /// Execute query.
     ///
     /// If 'dry_run' parameter is set, result would be the result table schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - request parameters.
     #[async_recursion]
     pub async fn query(
         &'async_recursion self,
@@ -865,9 +1064,102 @@ impl Bq {
         }
     }
 
+    /// Call insert_all API.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - loading data
+    /// * `p` - request parameters
+    pub async fn insert_all<T: Serialize + BqSchemaBuilder>(
+        self,
+        data: Vec<T>,
+        p: BqInsertAllParam,
+    ) -> Result<()> {
+        let mut create_param = BqCreateTableParam::new();
+        create_param.schema::<T>();
+        println!(
+            "{:?}",
+            self.create_table(&p.dataset, &p.table, create_param).await
+        );
+
+        let content: Vec<TableDataInsertAllRequestRows> = data
+            .iter()
+            .map(|d| {
+                let jstring = serde_json::to_string(d).unwrap();
+                let origin: HashMap<String, Value> = serde_json::from_str(&jstring).unwrap();
+                let content: HashMap<String, JsonValue> =
+                    origin.into_iter().map(|(k, v)| (k, JsonValue(v))).collect();
+                let mut rows = TableDataInsertAllRequestRows::default();
+                rows.json = Some(JsonObject(Some(content)));
+                rows
+            })
+            .collect();
+        let mut req = TableDataInsertAllRequest::default();
+        req.ignore_unknown_values = Some(p.ignore_unknown_values);
+        req.skip_invalid_rows = Some(p.skip_invalid_rows);
+        req.rows = Some(content);
+
+        self.call_insert_all(&p, &req, 0).await
+    }
+
+    /// Call insert_all API recursively.
+    ///
+    /// We have to wait until the table become available if the table was created right before
+    /// calling this function.
+    #[async_recursion]
+    async fn call_insert_all(
+        &self,
+        p: &BqInsertAllParam,
+        req: &TableDataInsertAllRequest,
+        retry_count: u64,
+    ) -> Result<()> {
+        let mut insert_all =
+            self.api
+                .tabledata()
+                .insert_all(req.clone(), &self.project, &p.dataset, &p.table);
+        if let Some(trace_id) = p.trace_id.clone() {
+            insert_all = insert_all.param("traceid", &trace_id);
+        }
+
+        let res = insert_all.doit().await;
+        match res {
+            Err(e) => match e {
+                Error::BadRequest(_) => {
+                    if 5 < retry_count {
+                        eprintln!("{}", e);
+                        Err(anyhow::anyhow!("{}", e))
+                    } else {
+                        let interval = 100 * retry_count.pow(2);
+                        // eprintln!("{}, {}", e, interval);
+                        thread::sleep(Duration::from_millis(interval));
+                        self.call_insert_all(p, req, retry_count + 1).await
+                    }
+                }
+                Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    Err(anyhow::anyhow!("{}", e))
+                }
+            },
+            Ok(_) => Ok(()),
+        }
+    }
+
     /// Call list_tabledata API.
     ///
     /// Notice: This will return whole table data.
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - target table
+    /// * `p` - request parameters
     #[async_recursion]
     pub async fn list_tabledata(
         &'async_recursion self,

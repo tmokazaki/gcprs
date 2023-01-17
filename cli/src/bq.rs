@@ -33,6 +33,8 @@ pub enum BqSubCommand {
     ListTables(ListTablesArgs),
     /// Show Table Schema JSON
     TableSchema(TableSchemaArgs),
+    /// Delete Table
+    TableDelete(TableDeleteArgs),
     /// Show Table Data
     ListTableData(ListTableDataArgs),
     /// Show Query result
@@ -55,6 +57,17 @@ pub struct ListTableDataArgs {
 
 #[derive(Default, Debug, Args)]
 pub struct TableSchemaArgs {
+    /// Dataset ID
+    #[clap(short = 'd', long = "dataset")]
+    dataset: String,
+
+    /// Table ID
+    #[clap(short = 't', long = "table")]
+    table: String,
+}
+
+#[derive(Default, Debug, Args)]
+pub struct TableDeleteArgs {
     /// Dataset ID
     #[clap(short = 'd', long = "dataset")]
     dataset: String,
@@ -257,11 +270,13 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
         }
         BqSubCommand::TableSchema(args) => {
             let bigquery = Bq::new(spauth, &project).unwrap();
-            let data = bigquery
-                .get_table_schema(&args.dataset, &args.table)
-                .await?;
-            let json_str = serde_json::to_string(&data)?;
+            let data = bigquery.get_table(&args.dataset, &args.table).await?;
+            let json_str = serde_json::to_string(&data.schemas)?;
             render(json_str, bqargs.raw)
+        }
+        BqSubCommand::TableDelete(args) => {
+            let bigquery = Bq::new(spauth, &project).unwrap();
+            bigquery.delete_table(&args.dataset, &args.table).await
         }
     }
 }
