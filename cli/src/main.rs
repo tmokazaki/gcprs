@@ -11,6 +11,7 @@ use gcs::{handle as handle_gcs, GcsArgs};
 enum SubCommand {
     /// Execute BigQuery APIs
     Bq(BqArgs),
+    /// Execute GCS APIs
     Gcs(GcsArgs),
 }
 
