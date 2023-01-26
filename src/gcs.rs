@@ -17,14 +17,26 @@ use serde::{Deserialize, Serialize};
 pub struct GcsObject {
     /// Bucket name
     pub bucket: String,
+
     /// Content type
     pub content_type: Option<String>,
+
     /// Name of the object
     pub name: Option<String>,
+
     /// Size of object
     pub size: Option<u64>,
+
+    /// Link to the object downloading
+    pub self_link: Option<String>,
+
+    /// Created At
     pub created_at: Option<DateTime<Utc>>,
+
+    /// Updated At
     pub updated_at: Option<DateTime<Utc>>,
+
+    /// The content
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
 }
@@ -32,10 +44,11 @@ pub struct GcsObject {
 impl GcsObject {
     pub fn new(bucket: String, name: String) -> GcsObject {
         GcsObject {
-            bucket: bucket,
+            bucket,
             content_type: None,
             name: Some(name),
             size: None,
+            self_link: None,
             created_at: None,
             updated_at: None,
             content: None,
@@ -136,7 +149,7 @@ impl Gcs {
             // get necessary parameters only.
             // reference: https://cloud.google.com/storage/docs/json_api/v1/objects
             gcs = gcs.param("fields",
-                "items/id,items/bucket,items/name,items/size,items/contentType,items/timeCreated,items/updated,nextPageToken,prefixes");
+                "items/id,items/bucket,items/name, items/selfLink,items/size,items/contentType,items/timeCreated,items/updated,nextPageToken,prefixes");
         };
         if let Some(token) = &p._next_token {
             gcs = gcs.page_token(&token);
@@ -151,6 +164,7 @@ impl Gcs {
                         content_type: None,
                         name: Some(item.clone()),
                         size: None,
+                        self_link: None,
                         content: None,
                         created_at: None,
                         updated_at: None,
@@ -167,6 +181,7 @@ impl Gcs {
                                 //Object { acl: None, bucket: Some("blocks-gn-okazaki-optimization-job-store"), cache_control: None, component_count: None, content_disposition: None, content_encoding: None, content_language: None, content_type: Some("application/octet-stream"), crc32c: Some("/6VwpQ=="), custom_time: None, customer_encryption: None, etag: Some("CNj04MXmk/ICEAE="), event_based_hold: None, generation: Some("1627957570845272"), id: Some("blocks-gn-okazaki-optimization-job-store/binpacking/4675ee901e83a39b1aefb8265d5ece9a/request/1627957570845272"), kind: Some("storage#object"), kms_key_name: None, md5_hash: Some("YoXBMt9CkzvaosvA1Ey9HA=="), media_link: Some("https://storage.googleapis.com/download/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest?generation=1627957570845272&alt=media"), metadata: None, metageneration: Some("1"), name: Some("binpacking/4675ee901e83a39b1aefb8265d5ece9a/request"), owner: None, retention_expiration_time: None, self_link: Some("https://www.googleapis.com/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest"), size: Some("2107"), storage_class: Some("STANDARD"), temporary_hold: None, time_created: Some("2021-08-03T02:26:10.866Z"), time_deleted: None, time_storage_class_updated: Some("2021-08-03T02:26:10.866Z"), updated: Some("2021-08-03T02:26:10.866Z") }
                                 let content_type =
                                     item.content_type.as_ref().map(|c| c.to_string());
+                                let self_link = item.self_link.as_ref().map(|c| c.to_string());
                                 let name = item.name.as_ref().map(|n| n.to_string());
                                 let size = item
                                     .size
@@ -197,6 +212,7 @@ impl Gcs {
                                     content_type,
                                     name,
                                     size,
+                                    self_link,
                                     content: None,
                                     created_at,
                                     updated_at,
@@ -229,7 +245,8 @@ impl Gcs {
                     .param("alt", "media")
                     .doit()
                     .await?;
-                let bytes = hyper::body::to_bytes(content.0.into_body()).await?;
+                let body = content.0.into_body();
+                let bytes = hyper::body::to_bytes(body).await?;
                 object.content = Some(String::from_utf8(bytes.to_vec())?);
                 Ok(())
             }
