@@ -47,14 +47,18 @@ Options:
 - gcs
 ```
 $ cli gcs --help
-Usage: cli gcs --bucket <BUCKET> <COMMAND>
+Execute GCS APIs
+
+Usage: cli gcs [OPTIONS] --bucket <BUCKET> <COMMAND>
 
 Commands:
-  list-object  Show list objects
-  help         Print this message or the help of the given subcommand(s)
+  list-object      Show list objects
+  object-metadata  Get object metadata
+  get-object       Get object
+  help             Print this message or the help of the given subcommand(s)
 
 Options:
   -b, --bucket <BUCKET>
+  -r, --raw_json         Output raw JSON
   -h, --help             Print help information
-
 ```

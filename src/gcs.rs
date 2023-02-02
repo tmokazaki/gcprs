@@ -1,5 +1,5 @@
 use crate::auth;
-use gcs::{Storage, api::Object};
+use gcs::{Storage, api::Object, Error};
 use google_storage1 as gcs;
 use hyper;
 use hyper_rustls;
@@ -265,10 +265,14 @@ impl Gcs {
             .param("alt", "json")
             .doit()
             .await?;
-//(Response { status: 200, version: HTTP/2.0, headers: {"x-guploader-uploadid": "ADPycdsMu23qbviXnxcIAWUV0mXmmkSx6HB5W5g-_-icnLIAE11DcXhTDK9SW9z6qTdJKdx3tyLVW3zOdA8FqH36CZL5nJTMsK2E", "etag": "CK73i/Sjt/MCEAE=", "content-type": "application/json; charset=UTF-8", "date": "Thu, 02 Feb 2023 02:40:30 GMT", "vary": "Origin", "vary": "X-Origin", "cache-control": "private, max-age=0, must-revalidate, no-transform", "expires": "Thu, 02 Feb 2023 02:40:30 GMT", "content-length": "997", "server": "UploadServer", "alt-svc": "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000,h3-Q050=\":443\"; ma=2592000,h3-Q046=\":443\"; ma=2592000,h3-Q043=\":443\"; ma=2592000,quic=\":443\"; ma=2592000; v=\"46,43\""}, body: Body(Streaming) }, Object { acl: None, bucket: Some("blocks-gn-okazaki-optimization-job-store"), cache_control: None, component_count: None, content_disposition: None, content_encoding: None, content_language: None, content_type: Some("application/octet-stream"), crc32c: Some("O+wWeg=="), custom_time: None, customer_encryption: None, etag: Some("CK73i/Sjt/MCEAE="), event_based_hold: None, generation: Some("1633574679935918"), id: Some("blocks-gn-okazaki-optimization-job-store/tsp/de5b11cbe64bbf844a323d3b1afb86c1/result/1633574679935918"), kind: Some("storage#object"), kms_key_name: None, md5_hash: Some("S5zumoYxZPfSoYYNThn1jA=="), media_link: Some("https://storage.googleapis.com/download/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/tsp%2Fde5b11cbe64bbf844a323d3b1afb86c1%2Fresult?generation=1633574679935918&alt=media"), metadata: None, metageneration: Some("1"), name: Some("tsp/de5b11cbe64bbf844a323d3b1afb86c1/result"), owner: None, retention_expiration_time: None, self_link: Some("https://www.googleapis.com/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/tsp%2Fde5b11cbe64bbf844a323d3b1afb86c1%2Fresult"), size: Some("1334"), storage_class: Some("STANDARD"), temporary_hold: None, time_created: Some("2021-10-07T02:44:39.937Z"), time_deleted: None, time_storage_class_updated: Some("2021-10-07T02:44:39.937Z"), updated: Some("2021-10-07T02:44:39.937Z") })
         Ok(self.to_object(&content.1))
     }
 
+    /// Get object and store `GcsObject` instance
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - to be stored object
     pub async fn get_object(&self, object: &mut GcsObject) -> Result<()> {
         match &object.name {
             Some(name) => {
@@ -279,12 +283,46 @@ impl Gcs {
                     .param("alt", "media")
                     .doit()
                     .await?;
+                //println!("{:?}", content);
                 let body = content.0.into_body();
                 let bytes = hyper::body::to_bytes(body).await?;
                 object.content = Some(String::from_utf8(bytes.to_vec())?);
                 Ok(())
             }
             _ => Err(anyhow::anyhow!("there is no object name")),
+        }
+    }
+
+    /// Get object stream. You need to store data by yourself.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - object name(full path)
+    pub async fn get_object_stream(&self, name: String) -> Result<hyper::Response<hyper::Body>> {
+        let resp = self
+            .api
+            .objects()
+            .get(&self.bucket, &urlencoding::encode(&name))
+            .param("alt", "media")
+            .doit()
+            .await;
+        match resp {
+            Ok((body, _)) => Ok(body),
+            Err(e) => match e {
+                Error::BadRequest(_)
+                | Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    Err(anyhow::anyhow!("{}", e))
+                }
+            }
         }
     }
 }

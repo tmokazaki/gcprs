@@ -76,6 +76,6 @@ impl GcpAuth {
         .await
         .expect("InstalledFlowAuthenticator failed to build");
 
-        Ok(GcpAuth { auth: auth })
+        Ok(GcpAuth { auth })
     }
 }

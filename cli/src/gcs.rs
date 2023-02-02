@@ -27,6 +27,9 @@ pub enum GcsSubCommand {
 
     /// Get object metadata
     ObjectMetadata(ObjectArgs),
+
+    /// Get object
+    GetObject(ObjectArgs),
 }
 
 #[derive(Default, Debug, Args)]
@@ -126,6 +129,14 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
         GcsSubCommand::ObjectMetadata(args) => {
             let data = cloud_storage.get_object_metadata(args.name).await?;
             render(&vec![data], gcsargs.raw)
+        }
+        GcsSubCommand::GetObject(args) => {
+            let mut object = GcsObject::new(bucket, args.name);
+            cloud_storage.get_object(&mut object).await?;
+            if let Some(content) = object.content {
+                println!("{}", content);
+            }
+            Ok(())
         }
     }
 }
