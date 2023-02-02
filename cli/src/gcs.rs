@@ -24,6 +24,15 @@ pub struct GcsArgs {
 pub enum GcsSubCommand {
     /// Show list objects
     ListObject,
+
+    /// Get object metadata
+    ObjectMetadata(ObjectArgs),
+}
+
+#[derive(Default, Debug, Args)]
+pub struct ObjectArgs {
+    #[clap(short = 'n', long = "name")]
+    name: String,
 }
 
 trait TableView {
@@ -98,17 +107,25 @@ fn render<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()>
 
 pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
     let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
-    let url = Url::parse(&gcsargs.bucket)?;
+    let (bucket, path) = if let Ok(url) = Url::parse(&gcsargs.bucket) {
+        (url.host_str().unwrap_or(&"".to_string()).to_string(), url.path().to_string())
+    } else {
+        (gcsargs.bucket, "".to_string())
+    };
     let cloud_storage = Gcs::new(
         spauth,
-        url.host_str().unwrap_or(&"".to_string()).to_string(),
+        bucket.clone(),
     );
     match gcsargs.gcs_sub_command {
         GcsSubCommand::ListObject => {
             let mut params = GcsListParam::new();
-            params.prefix(url.path());
-            let data = cloud_storage.list_objects(&params).await.unwrap();
+            params.prefix(&path);
+            let data = cloud_storage.list_objects(&params).await?;
             render(&data, gcsargs.raw)
+        }
+        GcsSubCommand::ObjectMetadata(args) => {
+            let data = cloud_storage.get_object_metadata(args.name).await?;
+            render(&vec![data], gcsargs.raw)
         }
     }
 }
