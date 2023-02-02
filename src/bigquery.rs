@@ -1,7 +1,7 @@
 use crate::auth;
 use bigquery::api::{
     Content, JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
-    TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema
+    TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema,
 };
 use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
@@ -19,8 +19,13 @@ use std::time::Duration;
 use std::{string, thread};
 use uuid::Uuid;
 
+/// Project ID
 type ProjectId = String;
+
+/// Dataset ID
 type DatasetId = String;
+
+/// Table ID
 type TableId = String;
 
 pub struct Bq {
@@ -41,25 +46,25 @@ pub struct BqProject {
 
 #[derive(Clone, Debug)]
 pub struct BqListParam {
-    _max_results: Option<u32>,
-    _page_token: Option<String>,
+    max_results: Option<u32>,
+    page_token: Option<String>,
 }
 
 impl BqListParam {
     pub fn new() -> BqListParam {
         BqListParam {
-            _max_results: Default::default(),
-            _page_token: Default::default(),
+            max_results: Default::default(),
+            page_token: Default::default(),
         }
     }
 
     pub fn max_results(&mut self, max_results: u32) -> &mut Self {
-        self._max_results = Some(max_results);
+        self.max_results = Some(max_results);
         self
     }
 
     pub fn page_token(&mut self, page_token: &str) -> &mut Self {
-        self._page_token = Some(page_token.to_string());
+        self.page_token = Some(page_token.to_string());
         self
     }
 }
@@ -693,10 +698,10 @@ impl Bq {
         p: &'async_recursion BqListParam,
     ) -> Result<Vec<BqDataset>> {
         let mut list_api = self.api.datasets().list(&self.project);
-        if let Some(max_results) = p._max_results {
+        if let Some(max_results) = p.max_results {
             list_api = list_api.max_results(max_results);
         }
-        if let Some(token) = &p._page_token {
+        if let Some(token) = &p.page_token {
             list_api = list_api.page_token(&token);
         }
         list_api = list_api.param(
@@ -849,10 +854,10 @@ impl Bq {
         p: &'async_recursion BqListParam,
     ) -> Result<Vec<BqTable>> {
         let mut list_api = self.api.tables().list(&self.project, &dataset);
-        if let Some(max_results) = p._max_results {
+        if let Some(max_results) = p.max_results {
             list_api = list_api.max_results(max_results);
         }
-        if let Some(token) = &p._page_token {
+        if let Some(token) = &p.page_token {
             list_api = list_api.page_token(&token);
         }
         list_api = list_api.param("fields",
@@ -1176,10 +1181,10 @@ impl Bq {
             &table.dataset.dataset,
             &table.table_id,
         );
-        if let Some(max_results) = p._max_results {
+        if let Some(max_results) = p.max_results {
             list_api = list_api.max_results(max_results);
         }
-        if let Some(token) = &p._page_token {
+        if let Some(token) = &p.page_token {
             list_api = list_api.page_token(&token);
         }
         let table_result_future = table_info.doit();
