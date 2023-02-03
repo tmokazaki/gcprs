@@ -3,6 +3,10 @@ use hyper;
 use hyper_rustls;
 use oauth2::authenticator::Authenticator;
 use oauth2::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowDelegate};
+use oauth2::{
+    authenticator::ApplicationDefaultCredentialsTypes, ApplicationDefaultCredentialsAuthenticator,
+    ApplicationDefaultCredentialsFlowOpts,
+};
 use std::env;
 use std::future::Future;
 use std::pin::Pin;
@@ -50,16 +54,31 @@ impl GcpAuth {
         self.auth.clone()
     }
 
+    /// Authenticate with service account.
+    ///
+    /// If there is `GOOGLE_APPLICATION_CREDENTIALS` in environment variables, use it first. Unless
+    /// try to get credential from metadata server on GCP.
     pub async fn from_service_account() -> Result<GcpAuth> {
-        let service_account_path = env::var("GOOGLE_APPLICATION_CREDENTIALS")?;
-        let cred = oauth2::read_service_account_key(service_account_path).await?;
-        let sa = oauth2::ServiceAccountAuthenticator::builder(cred)
-            .build()
-            .await?;
+        let opts = ApplicationDefaultCredentialsFlowOpts::default();
+        let authenticator = match ApplicationDefaultCredentialsAuthenticator::builder(opts).await {
+            ApplicationDefaultCredentialsTypes::InstanceMetadata(auth) => auth
+                .build()
+                .await
+                .expect("Unable to create instance metadata authenticator"),
+            ApplicationDefaultCredentialsTypes::ServiceAccount(auth) => auth
+                .build()
+                .await
+                .expect("Unable to create service account authenticator"),
+        };
 
-        Ok(GcpAuth { auth: sa })
+        Ok(GcpAuth {
+            auth: authenticator,
+        })
     }
 
+    /// Authenticate with OAuth2 application.
+    ///
+    /// You have to set the secret JSON path to `GOOGLE_APPLICATION_SECRET` environment variable.
     pub async fn from_user_auth() -> Result<GcpAuth> {
         let application_secret_path = env::var("GOOGLE_APPLICATION_SECRET")?;
         let secret: oauth2::ApplicationSecret =

@@ -1,5 +1,5 @@
 use crate::auth;
-use gcs::{Storage, api::Object, Error};
+use gcs::{api::Object, Error, Storage};
 use google_storage1 as gcs;
 use hyper;
 use hyper_rustls;
@@ -139,16 +139,12 @@ impl Gcs {
                 .build(),
         );
         let hub = Storage::new(client, auth.authenticator());
-        Gcs {
-            api: hub,
-            bucket,
-        }
+        Gcs { api: hub, bucket }
     }
 
     fn to_object(&self, item: &Object) -> GcsObject {
         //Object { acl: None, bucket: Some("blocks-gn-okazaki-optimization-job-store"), cache_control: None, component_count: None, content_disposition: None, content_encoding: None, content_language: None, content_type: Some("application/octet-stream"), crc32c: Some("/6VwpQ=="), custom_time: None, customer_encryption: None, etag: Some("CNj04MXmk/ICEAE="), event_based_hold: None, generation: Some("1627957570845272"), id: Some("blocks-gn-okazaki-optimization-job-store/binpacking/4675ee901e83a39b1aefb8265d5ece9a/request/1627957570845272"), kind: Some("storage#object"), kms_key_name: None, md5_hash: Some("YoXBMt9CkzvaosvA1Ey9HA=="), media_link: Some("https://storage.googleapis.com/download/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest?generation=1627957570845272&alt=media"), metadata: None, metageneration: Some("1"), name: Some("binpacking/4675ee901e83a39b1aefb8265d5ece9a/request"), owner: None, retention_expiration_time: None, self_link: Some("https://www.googleapis.com/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest"), size: Some("2107"), storage_class: Some("STANDARD"), temporary_hold: None, time_created: Some("2021-08-03T02:26:10.866Z"), time_deleted: None, time_storage_class_updated: Some("2021-08-03T02:26:10.866Z"), updated: Some("2021-08-03T02:26:10.866Z") }
-        let content_type =
-            item.content_type.as_ref().map(|c| c.to_string());
+        let content_type = item.content_type.as_ref().map(|c| c.to_string());
         let self_link = item.self_link.as_ref().map(|c| c.to_string());
         let name = item.name.as_ref().map(|n| n.to_string());
         let size = item
@@ -236,12 +232,7 @@ impl Gcs {
             },
             None => {
                 let mut objects = match result.1.items {
-                    Some(items) => {
-                        items
-                            .par_iter()
-                            .map(|item| self.to_object(item))
-                            .collect()
-                    }
+                    Some(items) => items.par_iter().map(|item| self.to_object(item)).collect(),
                     None => Vec::new(),
                 };
                 if let Some(token) = result.1.next_page_token {
@@ -322,7 +313,7 @@ impl Gcs {
                     eprintln!("{}", e);
                     Err(anyhow::anyhow!("{}", e))
                 }
-            }
+            },
         }
     }
 }
