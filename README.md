@@ -25,5 +25,8 @@ You can use following APIs via this library.
 - get_object
 - get_object_metadata
 - get_object_stream
+- insert_object
+  - insert_string: wrap insert_object function to call with String object
+  - insert_file: wrap insert_object function to call with file name
 
 ## Spread Sheet

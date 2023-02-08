@@ -41,6 +41,7 @@ Commands:
 Options:
   -p, --project <PROJECT>  GCP Project ID to use
   -r, --raw_json           Output raw JSON
+  -a, --auth_user        Authenticate with user application. otherwise authenticate with service account
   -h, --help               Print help information
 ```
 
@@ -55,10 +56,12 @@ Commands:
   list-object      Show list objects
   object-metadata  Get object metadata
   get-object       Get object
+  upload-file      Upload file
   help             Print this message or the help of the given subcommand(s)
 
 Options:
   -b, --bucket <BUCKET>
   -r, --raw_json         Output raw JSON
-  -h, --help             Print help information
+  -a, --auth_user        Authenticate with user application. otherwise authenticate with service account
+  -h, --help             Print help
 ```
