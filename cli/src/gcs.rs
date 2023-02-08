@@ -16,6 +16,10 @@ pub struct GcsArgs {
     #[clap(short = 'r', long = "raw_json", default_value = "false")]
     pub raw: bool,
 
+    /// Authenticate with user application. otherwise authenticate with service account
+    #[clap(short = 'a', long = "auth_user", default_value = "true")]
+    pub auth_user: bool,
+
     #[clap(subcommand)]
     pub gcs_sub_command: GcsSubCommand,
 }
@@ -121,8 +125,11 @@ fn render<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()>
 }
 
 pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
-    let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
-    //let spauth = auth::GcpAuth::from_service_account().await.unwrap();
+    let spauth = if gcsargs.auth_user {
+        auth::GcpAuth::from_user_auth().await.unwrap()
+    } else {
+        auth::GcpAuth::from_service_account().await.unwrap()
+    };
     let (bucket, path) = if let Ok(url) = Url::parse(&gcsargs.bucket) {
         (
             url.host_str().unwrap_or(&"".to_string()).to_string(),

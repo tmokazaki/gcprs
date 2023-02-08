@@ -19,6 +19,10 @@ pub struct BqArgs {
     #[clap(short = 'r', long = "raw_json", default_value = "false")]
     pub raw: bool,
 
+    /// Authenticate with user application. otherwise authenticate with service account
+    #[clap(short = 'a', long = "auth_user", default_value = "true")]
+    pub auth_user: bool,
+
     #[clap(subcommand)]
     pub bq_sub_command: BqSubCommand,
 }
@@ -227,7 +231,11 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
         }
     };
 
-    let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
+    let spauth = if bqargs.auth_user {
+        auth::GcpAuth::from_user_auth().await.unwrap()
+    } else {
+        auth::GcpAuth::from_service_account().await.unwrap()
+    };
     match bqargs.bq_sub_command {
         BqSubCommand::ListProject => {
             let data = Bq::list_project(spauth).await?;
