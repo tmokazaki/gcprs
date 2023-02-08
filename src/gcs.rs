@@ -3,6 +3,9 @@ use gcs::{api::Object, Error, Storage};
 use google_storage1 as gcs;
 use hyper;
 use hyper_rustls;
+use mime;
+use std::fs;
+use std::io::Cursor;
 use urlencoding;
 
 use chrono::{DateTime, Utc};
@@ -12,6 +15,7 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::io::{Read, Seek};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GcsObject {
@@ -42,7 +46,7 @@ pub struct GcsObject {
 }
 
 impl GcsObject {
-    pub fn new(bucket: String, name: String) -> GcsObject {
+    pub fn new(bucket: String, name: String) -> Self {
         GcsObject {
             bucket,
             content_type: None,
@@ -55,7 +59,25 @@ impl GcsObject {
         }
     }
 
+    /// Get mime object
+    ///
+    fn get_mime(&self) -> Option<mime::Mime> {
+        self.content_type.as_ref().map(|ct| {
+            ct.parse::<mime::Mime>()
+                .unwrap_or(mime::APPLICATION_OCTET_STREAM)
+        })
+    }
+
+    pub fn mime(&mut self, mime: String) -> &mut Self {
+        match mime.parse::<mime::Mime>() {
+            Ok(_) => self.content_type = Some(mime),
+            _ => self.content_type = Some(String::from("application/octet_stream")),
+        };
+        self
+    }
+
     /// Get path of this object
+    ///
     pub fn url(&self) -> String {
         format!(
             "gs://{}/{}",
@@ -63,11 +85,50 @@ impl GcsObject {
             self.name.as_ref().unwrap_or(&"".to_string())
         )
     }
+
+    pub fn from_object(bucket: &String, item: &Object) -> Self {
+        let content_type = item.content_type.as_ref().map(|c| c.to_string());
+        let self_link = item.self_link.as_ref().map(|c| c.to_string());
+        let name = item.name.as_ref().map(|n| n.to_string());
+        let size = item.size;
+        let created_at: Option<DateTime<Utc>> = item.time_created;
+        let updated_at: Option<DateTime<Utc>> = item.updated;
+        GcsObject {
+            bucket: bucket.to_string(),
+            content_type,
+            name,
+            size,
+            self_link,
+            content: None,
+            created_at,
+            updated_at,
+        }
+    }
+
+    pub fn to_object(&self) -> Object {
+        let mut object = Object::default();
+        object.name = self.name.as_ref().map(|n| n.to_string());
+        object.size = self.size;
+        object.content_type = self.content_type.as_ref().map(|c| c.to_string());
+        object.self_link = self.self_link.as_ref().map(|l| l.to_string());
+        object.time_created = self.created_at;
+        object.updated = self.updated_at;
+        object
+    }
 }
 
 pub struct Gcs {
     api: Storage<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
     bucket: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct GcsInsertParam {}
+
+impl GcsInsertParam {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -138,49 +199,8 @@ impl Gcs {
                 .enable_http2()
                 .build(),
         );
-        let hub = Storage::new(client, auth.authenticator());
-        Gcs { api: hub, bucket }
-    }
-
-    fn to_object(&self, item: &Object) -> GcsObject {
-        //Object { acl: None, bucket: Some("blocks-gn-okazaki-optimization-job-store"), cache_control: None, component_count: None, content_disposition: None, content_encoding: None, content_language: None, content_type: Some("application/octet-stream"), crc32c: Some("/6VwpQ=="), custom_time: None, customer_encryption: None, etag: Some("CNj04MXmk/ICEAE="), event_based_hold: None, generation: Some("1627957570845272"), id: Some("blocks-gn-okazaki-optimization-job-store/binpacking/4675ee901e83a39b1aefb8265d5ece9a/request/1627957570845272"), kind: Some("storage#object"), kms_key_name: None, md5_hash: Some("YoXBMt9CkzvaosvA1Ey9HA=="), media_link: Some("https://storage.googleapis.com/download/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest?generation=1627957570845272&alt=media"), metadata: None, metageneration: Some("1"), name: Some("binpacking/4675ee901e83a39b1aefb8265d5ece9a/request"), owner: None, retention_expiration_time: None, self_link: Some("https://www.googleapis.com/storage/v1/b/blocks-gn-okazaki-optimization-job-store/o/binpacking%2F4675ee901e83a39b1aefb8265d5ece9a%2Frequest"), size: Some("2107"), storage_class: Some("STANDARD"), temporary_hold: None, time_created: Some("2021-08-03T02:26:10.866Z"), time_deleted: None, time_storage_class_updated: Some("2021-08-03T02:26:10.866Z"), updated: Some("2021-08-03T02:26:10.866Z") }
-        let content_type = item.content_type.as_ref().map(|c| c.to_string());
-        let self_link = item.self_link.as_ref().map(|c| c.to_string());
-        let name = item.name.as_ref().map(|n| n.to_string());
-        let size = item
-            .size
-            .as_ref()
-            .map(|s| match s.parse::<u64>() {
-                Ok(n) => Some(n),
-                _ => None,
-            })
-            .flatten();
-        let created_at: Option<DateTime<Utc>> = item
-            .time_created
-            .as_ref()
-            .map(|t| match t.parse::<DateTime<Utc>>() {
-                Ok(dt) => Some(dt),
-                _ => None,
-            })
-            .flatten();
-        let updated_at: Option<DateTime<Utc>> = item
-            .updated
-            .as_ref()
-            .map(|t| match t.parse::<DateTime<Utc>>() {
-                Ok(dt) => Some(dt),
-                _ => None,
-            })
-            .flatten();
-        GcsObject {
-            bucket: self.bucket.to_string(),
-            content_type,
-            name,
-            size,
-            self_link,
-            content: None,
-            created_at,
-            updated_at,
-        }
+        let api = Storage::new(client, auth.authenticator());
+        Gcs { api, bucket }
     }
 
     #[async_recursion]
@@ -232,7 +252,10 @@ impl Gcs {
             },
             None => {
                 let mut objects = match result.1.items {
-                    Some(items) => items.par_iter().map(|item| self.to_object(item)).collect(),
+                    Some(items) => items
+                        .par_iter()
+                        .map(|item| GcsObject::from_object(&self.bucket, item))
+                        .collect(),
                     None => Vec::new(),
                 };
                 if let Some(token) = result.1.next_page_token {
@@ -256,7 +279,7 @@ impl Gcs {
             .param("alt", "json")
             .doit()
             .await?;
-        Ok(self.to_object(&content.1))
+        Ok(GcsObject::from_object(&self.bucket, &content.1))
     }
 
     /// Get object and store `GcsObject` instance
@@ -299,6 +322,82 @@ impl Gcs {
             .await;
         match resp {
             Ok((body, _)) => Ok(body),
+            Err(e) => match e {
+                Error::BadRequest(_)
+                | Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    Err(anyhow::anyhow!("{}", e))
+                }
+            },
+        }
+    }
+
+    /// Upload File to the bucket
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - GcsObject instance. The object name is used to store bucket.
+    /// * `file` - Name of the file.
+    /// * `p` - Request parameter.
+    pub async fn insert_file(
+        &self,
+        object: &GcsObject,
+        file: String,
+        p: Option<GcsInsertParam>,
+    ) -> Result<GcsObject> {
+        self.insert_object(object, fs::File::open(file)?, p).await
+    }
+
+    /// Upload String object to the bucket
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - GcsObject instance. The object name is used to store bucket.
+    /// * `str` - Data.
+    /// * `p` - Request parameter.
+    pub async fn insert_string(
+        &self,
+        object: &GcsObject,
+        str: String,
+        p: Option<GcsInsertParam>,
+    ) -> Result<GcsObject> {
+        self.insert_object(object, Cursor::new(str), p).await
+    }
+
+    /// Upload object stream to Bucket.
+    ///
+    /// # Arguments
+    ///
+    /// * `object` - GcsObject instance. The object name is used to store bucket.
+    /// * `stream` - Data.
+    /// * `p` - Request parameter.
+    pub async fn insert_object<T: Seek + Read + Send>(
+        &self,
+        object: &GcsObject,
+        stream: T,
+        p: Option<GcsInsertParam>,
+    ) -> Result<GcsObject> {
+        let req = object.to_object();
+        let insert = self.api.objects().insert(req, &self.bucket);
+        let mime_type = if let Some(m) = object.get_mime() {
+            m
+        } else {
+            mime::APPLICATION_OCTET_STREAM
+        };
+        let resp = insert.upload_resumable(stream, mime_type).await;
+        match resp {
+            Ok(content) => {
+                let obj = GcsObject::from_object(&self.bucket, &content.1);
+                Ok(obj)
+            }
             Err(e) => match e {
                 Error::BadRequest(_)
                 | Error::HttpError(_)

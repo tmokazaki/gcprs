@@ -30,10 +30,22 @@ pub enum GcsSubCommand {
 
     /// Get object
     GetObject(ObjectArgs),
+
+    /// Upload file
+    UploadFile(UploadArgs),
 }
 
 #[derive(Default, Debug, Args)]
 pub struct ObjectArgs {
+    #[clap(short = 'n', long = "name")]
+    name: String,
+}
+
+#[derive(Default, Debug, Args)]
+pub struct UploadArgs {
+    #[clap(short = 'f', long = "file")]
+    file: String,
+
     #[clap(short = 'n', long = "name")]
     name: String,
 }
@@ -110,15 +122,16 @@ fn render<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()>
 
 pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
     let spauth = auth::GcpAuth::from_user_auth().await.unwrap();
+    //let spauth = auth::GcpAuth::from_service_account().await.unwrap();
     let (bucket, path) = if let Ok(url) = Url::parse(&gcsargs.bucket) {
-        (url.host_str().unwrap_or(&"".to_string()).to_string(), url.path().to_string())
+        (
+            url.host_str().unwrap_or(&"".to_string()).to_string(),
+            url.path().to_string(),
+        )
     } else {
         (gcsargs.bucket, "".to_string())
     };
-    let cloud_storage = Gcs::new(
-        spauth,
-        bucket.clone(),
-    );
+    let cloud_storage = Gcs::new(spauth, bucket.clone());
     match gcsargs.gcs_sub_command {
         GcsSubCommand::ListObject => {
             let mut params = GcsListParam::new();
@@ -137,6 +150,11 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
                 println!("{}", content);
             }
             Ok(())
+        }
+        GcsSubCommand::UploadFile(args) => {
+            let object = GcsObject::new(bucket, args.name);
+            let result = cloud_storage.insert_file(&object, args.file, None).await?;
+            render(&vec![result], gcsargs.raw)
         }
     }
 }
