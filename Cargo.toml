@@ -9,9 +9,11 @@ edition = "2021"
 [workspace]
 members = [
   "cli",
+  "server",
 ]
 exclude = [
   "binpacking_web",
+  "shift_web",
 ]
 
 [dependencies]
@@ -24,7 +26,7 @@ chrono = { version = "0.4", features = ["serde"] }
 anyhow = { version = "^1.0", features = ["backtrace"] }
 hyper = "^0.14"
 hyper-rustls = "^0.23.0"
-yup-oauth2 = "^7.0"
+yup-oauth2 = "^8.0"
 rayon = "^1.5"
 urlencoding = "1.0.0"
 webbrowser = "0.5"
@@ -32,9 +34,10 @@ tokio = { version = "^1.0", features = ["full"] }
 
 
 google-storage1 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
-google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "schema_mode_support" }
+google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main" }
 google-sheets4 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+mime = "0.3.16"
 
 [dev-dependencies]
 speculate = "*"

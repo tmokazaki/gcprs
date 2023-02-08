@@ -1,6 +1,6 @@
 use crate::auth;
 use bigquery::api::{
-    Content, JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
+    JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
     TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema,
 };
 use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
@@ -423,91 +423,65 @@ impl string::ToString for BqColumn {
 }
 
 impl BqColumn {
+    fn value_to_bq_value(v: Option<Value>, schema: &BqTableSchema) -> BqValue {
+        v.map(|val| match val {
+            Value::String(s) => match schema.type_ {
+                BqType::STRING => BqValue::BqString(s),
+                BqType::INTEGER => BqValue::BqInteger(s.parse::<i64>().unwrap_or(0)),
+                BqType::FLOAT => BqValue::BqFloat(s.parse::<f64>().unwrap_or(0.0)),
+                BqType::BOOLEAN => BqValue::BqBool(s == "true"),
+                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_utc(
+                    NaiveDateTime::from_timestamp_opt(s.parse::<f64>().unwrap_or(0.0) as i64, 0)
+                        .unwrap(),
+                    Utc,
+                )),
+                _ => BqValue::BqNull,
+            },
+            Value::Number(n) => match schema.type_ {
+                BqType::STRING => BqValue::BqString(n.to_string()),
+                BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
+                BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
+                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_utc(
+                    NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
+                    Utc,
+                )),
+                _ => BqValue::BqNull,
+            },
+            Value::Bool(b) => match schema.type_ {
+                BqType::BOOLEAN => BqValue::BqBool(b),
+                _ => BqValue::BqNull,
+            },
+            Value::Array(arr) => {
+                let columns: Vec<Box<BqValue>> = arr
+                    .iter()
+                    .map(|s| Box::new(Self::value_to_bq_value(Some(s.clone()), &schema)))
+                    .collect();
+                BqValue::BqRepeated(columns)
+            }
+            Value::Object(o) => {
+                if let Some(Value::Array(arr)) = &o.get("f") {
+                    let columns: Vec<BqColumn> = arr
+                        .iter()
+                        .enumerate()
+                        .map(|(i, s)| {
+                            BqColumn::new(&TableCell { v: Some(s.clone()) }, &schema.fields[i])
+                        })
+                        .collect();
+                    BqValue::BqStruct(BqRow::new(columns))
+                } else if o.get("v").is_some() {
+                    Self::value_to_bq_value(o.get("v").map(|v| v.clone()), &schema)
+                } else {
+                    BqValue::BqNull
+                }
+            }
+            Value::Null => BqValue::BqNull,
+        })
+        .unwrap_or(BqValue::BqNull)
+    }
+
     fn new(cell: &TableCell, schema: &BqTableSchema) -> Self {
         let name = schema.name.clone();
-        let value = match &schema.type_ {
-            BqType::STRING => {
-                if let Content::Value(s) = &cell.v {
-                    BqValue::BqString(s.to_string())
-                } else {
-                    BqValue::BqNull
-                }
-            }
-            BqType::INTEGER => {
-                if let Content::Value(s) = &cell.v {
-                    BqValue::BqInteger(s.parse::<i64>().unwrap_or(0))
-                } else {
-                    BqValue::BqNull
-                }
-            }
-            BqType::FLOAT => {
-                if let Content::Value(s) = &cell.v {
-                    BqValue::BqFloat(s.parse().unwrap_or(0.0))
-                } else {
-                    BqValue::BqNull
-                }
-            }
-            BqType::BOOLEAN => {
-                if let Content::Value(s) = &cell.v {
-                    BqValue::BqBool(s.parse().unwrap_or(false))
-                } else {
-                    BqValue::BqNull
-                }
-            }
-            BqType::TIMESTAMP => {
-                if let Content::Value(s) = &cell.v {
-                    BqValue::BqTimestamp(DateTime::from_utc(
-                        NaiveDateTime::from_timestamp_opt(
-                            s.parse::<f64>().map(|v| v as i64).unwrap_or(0),
-                            0,
-                        )
-                        .unwrap(),
-                        Utc,
-                    ))
-                } else {
-                    BqValue::BqNull
-                }
-            }
-            BqType::RECORD => match schema.mode {
-                BqMode::REPEATED => match &cell.v {
-                    Content::Repeated(cells) => {
-                        let columns = cells
-                            .iter()
-                            .map(|c| Box::new(BqColumn::new(c, &schema).value))
-                            .collect();
-                        BqValue::BqRepeated(columns)
-                    }
-                    Content::Struct(row) => {
-                        let columns: Vec<BqColumn> = match &row.f {
-                            Some(cs) => cs
-                                .iter()
-                                .enumerate()
-                                .map(|(i, c)| BqColumn::new(c, &schema.fields[i]))
-                                .collect(),
-                            None => vec![],
-                        };
-                        BqValue::BqStruct(BqRow::new(columns))
-                    }
-                    _ => BqValue::BqNull,
-                },
-                _ => {
-                    if let Content::Struct(row) = &cell.v {
-                        let columns: Vec<BqColumn> = match &row.f {
-                            Some(cs) => cs
-                                .iter()
-                                .enumerate()
-                                .map(|(i, c)| BqColumn::new(c, &schema.fields[i]))
-                                .collect(),
-                            None => vec![],
-                        };
-                        BqValue::BqStruct(BqRow::new(columns))
-                    } else {
-                        BqValue::BqNull
-                    }
-                }
-            },
-            BqType::UNKNOWN => BqValue::BqNull,
-        };
+        let value = Self::value_to_bq_value(cell.v.as_ref().map(|v| v.clone()), schema);
         BqColumn { name, value }
     }
 
@@ -675,7 +649,10 @@ impl Bq {
                         .map(|p| BqProject {
                             friendly_name: p.friendly_name.as_ref().unwrap().clone(),
                             id: p.id.as_ref().unwrap().clone(),
-                            numeric_id: p.numeric_id.as_ref().unwrap().clone(),
+                            numeric_id: p
+                                .numeric_id
+                                .map(|id| format!("{}", id))
+                                .unwrap_or("".to_string()),
                         })
                         .collect(),
                     None => vec![],
@@ -769,11 +746,8 @@ impl Bq {
             },
             table_id: table_id.clone(),
             schemas: Some(schemas),
-            created_at: t.creation_time.as_ref().map(|t| t.parse::<u64>().unwrap()),
-            expired_at: t
-                .expiration_time
-                .as_ref()
-                .map(|t| t.parse::<u64>().unwrap()),
+            created_at: t.creation_time.map(|t| t as u64),
+            expired_at: t.expiration_time.map(|t| t as u64),
         }
     }
 
@@ -884,14 +858,8 @@ impl Bq {
                                 dataset: BqDataset::new(&self.project, &dataset_id),
                                 table_id: table_id.to_string(),
                                 schemas: None,
-                                created_at: t
-                                    .creation_time
-                                    .as_ref()
-                                    .map(|t| t.parse::<u64>().unwrap()),
-                                expired_at: t
-                                    .expiration_time
-                                    .as_ref()
-                                    .map(|t| t.parse::<u64>().unwrap()),
+                                created_at: t.creation_time.map(|t| t as u64),
+                                expired_at: t.expiration_time.map(|t| t as u64),
                             }
                         })
                         .collect(),
