@@ -1,4 +1,5 @@
 use crate::auth;
+use super::common::error::BadRequest;
 use gcs::{api::Object, Error, Storage};
 use google_storage1 as gcs;
 use hyper;
@@ -232,7 +233,31 @@ impl Gcs {
         if let Some(eo) = &p.end_offset {
             gcs = gcs.end_offset(&eo);
         }
-        let result = gcs.doit().await?;
+        let res = gcs.doit().await;
+        let result = match res {
+            Ok(result) => result,
+            Err(e) => match e {
+                Error::BadRequest(badrequest) => {
+                    if let Ok(br) = serde_json::from_value::<BadRequest>(badrequest.clone()) {
+                        anyhow::bail!(br.request_error())
+                    } else {
+                        anyhow::bail!(badrequest)
+                    }
+                },
+                Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    anyhow::bail!(e)
+                }
+            },
+        };
         let objects = match &p.delimiter {
             Some(_) => match result.1.prefixes {
                 Some(prefixes) => prefixes
@@ -272,13 +297,37 @@ impl Gcs {
     }
 
     pub async fn get_object_metadata(&self, name: String) -> Result<GcsObject> {
-        let content = self
+        let res = self
             .api
             .objects()
             .get(&self.bucket, &urlencoding::encode(&name))
             .param("alt", "json")
             .doit()
-            .await?;
+            .await;
+        let content = match res {
+            Ok(result) => result,
+            Err(e) => match e {
+                Error::BadRequest(badrequest) => {
+                    if let Ok(br) = serde_json::from_value::<BadRequest>(badrequest.clone()) {
+                        anyhow::bail!(br.request_error())
+                    } else {
+                        anyhow::bail!(badrequest)
+                    }
+                },
+                Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    anyhow::bail!(e)
+                }
+            },
+        };
         Ok(GcsObject::from_object(&self.bucket, &content.1))
     }
 
@@ -334,7 +383,7 @@ impl Gcs {
                 | Error::FieldClash(_)
                 | Error::JsonDecodeError(_, _) => {
                     eprintln!("{}", e);
-                    Err(anyhow::anyhow!("{}", e))
+                    anyhow::bail!(e)
                 }
             },
         }
@@ -378,12 +427,12 @@ impl Gcs {
     ///
     /// * `object` - GcsObject instance. The object name is used to store bucket.
     /// * `stream` - Data.
-    /// * `p` - Request parameter.
+    /// * `p` - Request parameter. For future use.
     pub async fn insert_object<T: Seek + Read + Send>(
         &self,
         object: &GcsObject,
         stream: T,
-        p: Option<GcsInsertParam>,
+        _p: Option<GcsInsertParam>,
     ) -> Result<GcsObject> {
         let req = object.to_object();
         let insert = self.api.objects().insert(req, &self.bucket);
@@ -397,10 +446,16 @@ impl Gcs {
             Ok(content) => {
                 let obj = GcsObject::from_object(&self.bucket, &content.1);
                 Ok(obj)
-            }
+            },
             Err(e) => match e {
-                Error::BadRequest(_)
-                | Error::HttpError(_)
+                Error::BadRequest(badrequest) => {
+                    if let Ok(br) = serde_json::from_value::<BadRequest>(badrequest.clone()) {
+                        anyhow::bail!(br.request_error())
+                    } else {
+                        anyhow::bail!(badrequest)
+                    }
+                },
+                Error::HttpError(_)
                 | Error::Io(_)
                 | Error::MissingAPIKey
                 | Error::MissingToken(_)
@@ -410,7 +465,7 @@ impl Gcs {
                 | Error::FieldClash(_)
                 | Error::JsonDecodeError(_, _) => {
                     eprintln!("{}", e);
-                    Err(anyhow::anyhow!("{}", e))
+                    anyhow::bail!(e)
                 }
             },
         }
