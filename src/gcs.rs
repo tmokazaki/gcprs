@@ -191,7 +191,7 @@ impl GcsListParam {
 }
 
 impl Gcs {
-    pub fn new(auth: auth::GcpAuth, bucket: String) -> Gcs {
+    pub fn new(auth: &auth::GcpAuth, bucket: String) -> Gcs {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()

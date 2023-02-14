@@ -242,19 +242,19 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             render2(&data, bqargs.raw)
         }
         BqSubCommand::ListDataset => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_dataset(&list_params).await?;
             render2(&data, bqargs.raw)
         }
         BqSubCommand::ListTables(args) => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_tables(&args.dataset, &list_params).await?;
             render2(&data, bqargs.raw)
         }
         BqSubCommand::ListTableData(args) => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             let mut list_params = BqListParam::new();
             list_params.max_results(args.max_results);
             let table = BqTable::new(&project, &args.dataset, &args.table);
@@ -262,7 +262,7 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             render2(&data, bqargs.raw)
         }
         BqSubCommand::Query(args) => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             let mut query_params = BqQueryParam::new(&args.query);
             query_params.max_results(args.max_results);
             query_params.dry_run(args.dry_run);
@@ -277,13 +277,13 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             }
         }
         BqSubCommand::TableSchema(args) => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             let data = bigquery.get_table(&args.dataset, &args.table).await?;
             let json_str = serde_json::to_string(&data.schemas)?;
             render(json_str, bqargs.raw)
         }
         BqSubCommand::TableDelete(args) => {
-            let bigquery = Bq::new(spauth, &project).unwrap();
+            let bigquery = Bq::new(&spauth, &project).unwrap();
             bigquery.delete_table(&args.dataset, &args.table).await
         }
     }

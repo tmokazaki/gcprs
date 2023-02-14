@@ -58,7 +58,7 @@ impl ValueRenderOption {
 }
 
 impl SpreadSheet {
-    pub fn new(auth: auth::GcpAuth) -> Result<SpreadSheet> {
+    pub fn new(auth: &auth::GcpAuth) -> Result<SpreadSheet> {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()

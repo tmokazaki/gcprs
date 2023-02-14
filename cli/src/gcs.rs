@@ -138,7 +138,7 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
     } else {
         (gcsargs.bucket, "".to_string())
     };
-    let cloud_storage = Gcs::new(spauth, bucket.clone());
+    let cloud_storage = Gcs::new(&spauth, bucket.clone());
     match gcsargs.gcs_sub_command {
         GcsSubCommand::ListObject => {
             let mut params = GcsListParam::new();

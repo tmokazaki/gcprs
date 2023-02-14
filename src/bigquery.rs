@@ -605,7 +605,7 @@ impl BqTable {
 }
 
 impl Bq {
-    pub fn new(auth: auth::GcpAuth, project: &str) -> Result<Bq> {
+    pub fn new(auth: &auth::GcpAuth, project: &str) -> Result<Bq> {
         let client = hyper::Client::builder().build(
             hyper_rustls::HttpsConnectorBuilder::new()
                 .with_native_roots()
