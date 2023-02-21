@@ -13,11 +13,16 @@ pub struct DataFusionArgs {
     #[clap(subcommand)]
     pub datafusion_sub_command: DataFusionSubCommand,
 
-    /// Input files
+    /// Input files.
+    ///
+    /// You can use glob format for a single table.
+    /// Multiple tables are also supported. To use it, add `-i <filename>` arguments as you need.
     #[clap(short = 'i', long = "inputs")]
     pub inputs: Vec<String>,
 
-    /// Output file
+    /// Output file. Optional.
+    ///
+    /// The result is always shown in stdout. This option write the result to the file.
     #[clap(short = 'o', long = "output", default_value = None)]
     pub output: Option<String>,
 }

@@ -15,6 +15,7 @@ Usage: cli <COMMAND>
 Commands:
   bq    Execute BigQuery APIs
   gcs   Execute GCS APIs
+  df    Execute DataFusion
   help  Print this message or the help of the given subcommand(s)
 
 Options:
@@ -63,5 +64,29 @@ Options:
   -b, --bucket <BUCKET>
   -r, --raw_json         Output raw JSON
   -a, --auth_user        Authenticate with user application. otherwise authenticate with service account
+  -h, --help             Print help
+```
+
+- df
+
+Load CSV/new line delimited JSON/Parquet file and query the data using [Apache DataFusion](https://arrow.apache.org/datafusion/).
+
+Input file will have a special name `t[0..n]` in SQL. For example, if you pass the input like `-i data_1.json -i data_2.json`, the query must be "select * from t0, t1". The `t0` is the first file `data_1.json` and `t1` is the second `data_2.json`.
+
+Inpu/Output filename must have extension. Supported extensions are `json`, `csv` and `parquet`.
+
+```
+$ cli df --help
+Execute DataFusion
+
+Usage: cli df [OPTIONS] <COMMAND>
+
+Commands:
+  query  Query
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -i, --inputs <INPUTS>  Input files
+  -o, --output <OUTPUT>  Output file
   -h, --help             Print help
 ```
