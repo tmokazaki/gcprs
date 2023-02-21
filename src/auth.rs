@@ -58,7 +58,7 @@ impl GcpAuth {
     ///
     /// If there is `GOOGLE_APPLICATION_CREDENTIALS` in environment variables, use it first. Unless
     /// try to get credential from metadata server on GCP.
-    pub async fn from_service_account() -> Result<GcpAuth> {
+    pub async fn from_service_account() -> Result<Self> {
         let opts = ApplicationDefaultCredentialsFlowOpts::default();
         let authenticator = match ApplicationDefaultCredentialsAuthenticator::builder(opts).await {
             ApplicationDefaultCredentialsTypes::InstanceMetadata(auth) => auth
@@ -79,7 +79,7 @@ impl GcpAuth {
     /// Authenticate with OAuth2 application.
     ///
     /// You have to set the secret JSON path to `GOOGLE_APPLICATION_SECRET` environment variable.
-    pub async fn from_user_auth() -> Result<GcpAuth> {
+    pub async fn from_user_auth() -> Result<Self> {
         let application_secret_path = env::var("GOOGLE_APPLICATION_SECRET")?;
         let secret: oauth2::ApplicationSecret =
             oauth2::read_application_secret(application_secret_path)

@@ -16,8 +16,13 @@ pub struct BqArgs {
     pub project: Option<String>,
 
     /// Output raw JSON
-    #[clap(short = 'r', long = "raw_json", default_value = "false")]
-    pub raw: bool,
+    #[clap(short = 'j', long = "json", default_value = "false")]
+    pub json: bool,
+
+    /// Output New line delimited JSON
+    /// This must be used with json output otherwise ignored.
+    #[clap(short = 'n', long = "new_line", default_value = "false")]
+    pub new_line: bool,
 
     /// Authenticate with user application. otherwise authenticate with service account
     #[clap(short = 'a', long = "auth_user", default_value = "true")]
@@ -194,10 +199,23 @@ fn render(json_str: String, raw_json: bool) -> Result<()> {
     Ok(())
 }
 
-fn render2<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()> {
-    if raw_json {
-        let json_str = serde_json::to_string(&data)?;
-        println!("{}", json_str)
+fn render2<T: TableView + Serialize>(
+    data: &Vec<T>,
+    json: bool,
+    newline_delimited: bool,
+) -> Result<()> {
+    if json {
+        if newline_delimited {
+            let json_str = data
+                .iter()
+                .map(|d| serde_json::to_string(&d).unwrap())
+                .collect::<Vec<String>>()
+                .join("\n");
+            println!("{}", json_str)
+        } else {
+            let json_str = serde_json::to_string(&data)?;
+            println!("{}", json_str)
+        }
     } else {
         let mut builder = Builder::default();
         let header = if 0 < data.len() {
@@ -239,19 +257,19 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
     match bqargs.bq_sub_command {
         BqSubCommand::ListProject => {
             let data = Bq::list_project(spauth).await?;
-            render2(&data, bqargs.raw)
+            render2(&data, bqargs.json, bqargs.new_line)
         }
         BqSubCommand::ListDataset => {
             let bigquery = Bq::new(&spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_dataset(&list_params).await?;
-            render2(&data, bqargs.raw)
+            render2(&data, bqargs.json, bqargs.new_line)
         }
         BqSubCommand::ListTables(args) => {
             let bigquery = Bq::new(&spauth, &project).unwrap();
             let list_params = BqListParam::new();
             let data = bigquery.list_tables(&args.dataset, &list_params).await?;
-            render2(&data, bqargs.raw)
+            render2(&data, bqargs.json, bqargs.new_line)
         }
         BqSubCommand::ListTableData(args) => {
             let bigquery = Bq::new(&spauth, &project).unwrap();
@@ -259,7 +277,8 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             list_params.max_results(args.max_results);
             let table = BqTable::new(&project, &args.dataset, &args.table);
             let data = bigquery.list_tabledata(&table, &list_params).await?;
-            render2(&data, bqargs.raw)
+
+            render2(&data, bqargs.json, bqargs.new_line)
         }
         BqSubCommand::Query(args) => {
             let bigquery = Bq::new(&spauth, &project).unwrap();
@@ -269,10 +288,10 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             let data = bigquery.query(&query_params).await?;
 
             match data {
-                QueryResult::Data(ds) => render2(&ds, bqargs.raw),
+                QueryResult::Data(ds) => render2(&ds, bqargs.json, bqargs.new_line),
                 QueryResult::Schema(schemas) => {
                     let json_str = serde_json::to_string(&schemas)?;
-                    render(json_str, bqargs.raw)
+                    render(json_str, bqargs.json)
                 }
             }
         }
@@ -280,7 +299,7 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
             let bigquery = Bq::new(&spauth, &project).unwrap();
             let data = bigquery.get_table(&args.dataset, &args.table).await?;
             let json_str = serde_json::to_string(&data.schemas)?;
-            render(json_str, bqargs.raw)
+            render(json_str, bqargs.json)
         }
         BqSubCommand::TableDelete(args) => {
             let bigquery = Bq::new(&spauth, &project).unwrap();

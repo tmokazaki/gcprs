@@ -9,6 +9,7 @@ use url::Url;
 
 #[derive(Debug, Args)]
 pub struct GcsArgs {
+    /// Bucket name
     #[clap(short = 'b', long = "bucket")]
     pub bucket: String,
 

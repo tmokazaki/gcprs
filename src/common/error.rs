@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
-use serde::{Deserialize, Serialize};
 
 /// Google API response BadRequest
 ///
@@ -11,25 +11,25 @@ pub enum RequestError {
     /// 404 notfound
     NotFound {
         code: u16,
-        message: String
+        message: String,
     },
     /// 403 forbidden
     Forbidden {
         code: u16,
-        message: String
+        message: String,
     },
     Undefined {
         code: u16,
         message: String,
-    }
+    },
 }
 
 impl fmt::Display for RequestError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             RequestError::NotFound { code, message }
-             | RequestError::Forbidden { code, message }
-             | RequestError::Undefined { code, message } => write!(f, "code: {}, {}", code, message) ,
+            | RequestError::Forbidden { code, message }
+            | RequestError::Undefined { code, message } => write!(f, "code: {}, {}", code, message),
         }
     }
 }
@@ -40,24 +40,31 @@ impl Error for RequestError {
     }
 }
 
-
 const UNKNOWN_CODE: u16 = 500;
 const UNKNOWN_MESSAGE: &str = "Unknown error";
 
 impl BadRequest {
-
     fn code_message(&self) -> (u16, String) {
-        self.error.as_ref()
-            .map(|e| (e.code.unwrap_or(UNKNOWN_CODE), e.message.as_ref().map(|m| m.clone()).unwrap_or(String::from(UNKNOWN_MESSAGE))))
+        self.error
+            .as_ref()
+            .map(|e| {
+                (
+                    e.code.unwrap_or(UNKNOWN_CODE),
+                    e.message
+                        .as_ref()
+                        .map(|m| m.clone())
+                        .unwrap_or(String::from(UNKNOWN_MESSAGE)),
+                )
+            })
             .unwrap_or((UNKNOWN_CODE, String::from(UNKNOWN_MESSAGE)))
     }
 
     pub fn request_error(&self) -> RequestError {
         let (code, message) = self.code_message();
         match code {
-            404 => RequestError::NotFound { code, message, },
-            403 => RequestError::Forbidden { code, message, },
-            _ => RequestError::Undefined { code, message, }
+            404 => RequestError::NotFound { code, message },
+            403 => RequestError::Forbidden { code, message },
+            _ => RequestError::Undefined { code, message },
         }
     }
 }

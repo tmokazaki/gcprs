@@ -1,5 +1,5 @@
-use crate::auth;
 use super::common::error::BadRequest;
+use crate::auth;
 use gcs::{api::Object, Error, Storage};
 use google_storage1 as gcs;
 use hyper;
@@ -243,7 +243,7 @@ impl Gcs {
                     } else {
                         anyhow::bail!(badrequest)
                     }
-                },
+                }
                 Error::HttpError(_)
                 | Error::Io(_)
                 | Error::MissingAPIKey
@@ -313,7 +313,7 @@ impl Gcs {
                     } else {
                         anyhow::bail!(badrequest)
                     }
-                },
+                }
                 Error::HttpError(_)
                 | Error::Io(_)
                 | Error::MissingAPIKey
@@ -446,7 +446,7 @@ impl Gcs {
             Ok(content) => {
                 let obj = GcsObject::from_object(&self.bucket, &content.1);
                 Ok(obj)
-            },
+            }
             Err(e) => match e {
                 Error::BadRequest(badrequest) => {
                     if let Ok(br) = serde_json::from_value::<BadRequest>(badrequest.clone()) {
@@ -454,7 +454,7 @@ impl Gcs {
                     } else {
                         anyhow::bail!(badrequest)
                     }
-                },
+                }
                 Error::HttpError(_)
                 | Error::Io(_)
                 | Error::MissingAPIKey
