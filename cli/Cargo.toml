@@ -18,3 +18,4 @@ url = "^2"
 gcprs = { path = "../" }
 datafusion = "18.0.0"
 thiserror = "1.0.38"
+object_store = { version = "0.5.4", features = ["gcp"] }
