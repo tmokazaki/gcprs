@@ -28,16 +28,19 @@ pub struct GcsArgs {
 #[derive(Debug, Subcommand)]
 pub enum GcsSubCommand {
     /// Show list objects
-    ListObject,
+    List,
 
     /// Get object metadata
     ObjectMetadata(ObjectArgs),
 
     /// Get object
-    GetObject(ObjectArgs),
+    Get(ObjectArgs),
 
     /// Upload file
     UploadFile(UploadArgs),
+
+    /// Delete object
+    Delete(ObjectArgs),
 }
 
 #[derive(Default, Debug, Args)]
@@ -141,7 +144,7 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
     };
     let cloud_storage = Gcs::new(&spauth, bucket.clone());
     match gcsargs.gcs_sub_command {
-        GcsSubCommand::ListObject => {
+        GcsSubCommand::List=> {
             let mut params = GcsListParam::new();
             params.prefix(&path);
             let data = cloud_storage.list_objects(&params).await?;
@@ -151,12 +154,16 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
             let data = cloud_storage.get_object_metadata(args.name).await?;
             render(&vec![data], gcsargs.raw)
         }
-        GcsSubCommand::GetObject(args) => {
+        GcsSubCommand::Get(args) => {
             let mut object = GcsObject::new(bucket, args.name);
             cloud_storage.get_object(&mut object).await?;
             if let Some(content) = object.content {
                 println!("{}", content);
             }
+            Ok(())
+        }
+        GcsSubCommand::Delete(args) => {
+            cloud_storage.delete_object(&args.name).await?;
             Ok(())
         }
         GcsSubCommand::UploadFile(args) => {

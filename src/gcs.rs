@@ -470,4 +470,27 @@ impl Gcs {
             },
         }
     }
+
+    /// Delete object in Bucket.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of object.
+    pub async fn delete_object(
+        &self,
+        name: &String,
+    ) -> Result<()> {
+        let delete = self.api.objects().delete(&self.bucket, &urlencoding::encode(name));
+        let resp = delete.doit().await;
+        println!("{:?}", resp);
+        match resp {
+            Ok(_content) => {
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                anyhow::bail!(e)
+            }
+        }
+    }
 }
