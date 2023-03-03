@@ -37,6 +37,7 @@ google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", br
 google-sheets4 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mime = "0.3.16"
+jsonwebtoken = { version = "8.2.0", features = ["use_pem"] }
 
 [dev-dependencies]
 speculate = "*"

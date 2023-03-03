@@ -6,6 +6,8 @@ use gcprs::bigquery;
 use json_to_table::{json_to_table, Orientation};
 use serde::Serialize;
 use std::env;
+use std::io;
+use std::io::Write;
 use std::process;
 use tabled::{builder::Builder, Style};
 
@@ -204,17 +206,15 @@ fn render2<T: TableView + Serialize>(
     json: bool,
     newline_delimited: bool,
 ) -> Result<()> {
+    let mut writer = io::BufWriter::new(io::stdout());
     if json {
         if newline_delimited {
-            let json_str = data
-                .iter()
-                .map(|d| serde_json::to_string(&d).unwrap())
-                .collect::<Vec<String>>()
-                .join("\n");
-            println!("{}", json_str)
+            for data in data.iter() {
+                writer.write(serde_json::to_string(&data)?.as_bytes())?;
+                writer.write("\n".as_bytes())?;
+            }
         } else {
-            let json_str = serde_json::to_string(&data)?;
-            println!("{}", json_str)
+            writer.write(serde_json::to_string(&data)?.as_bytes())?;
         }
     } else {
         let mut builder = Builder::default();
@@ -231,7 +231,7 @@ fn render2<T: TableView + Serialize>(
         let mut table = builder.build();
         table.with(Style::markdown());
 
-        println!("{}", table);
+        writer.write(table.to_string().as_bytes())?;
     }
     Ok(())
 }

@@ -1,15 +1,20 @@
+mod func;
+
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::{
     CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
+use func::udf_pow;
+use object_store::gcp::GoogleCloudStorageBuilder;
 use std::ffi::OsStr;
 use std::fs::remove_dir_all;
+use std::io;
+use std::io::Write;
 use std::path::Path;
-use thiserror::Error;
-use object_store::gcp::GoogleCloudStorageBuilder;
 use std::sync::Arc;
+use thiserror::Error;
 use url::Url;
 
 #[derive(Debug, Args)]
@@ -24,6 +29,10 @@ pub struct DataFusionArgs {
     #[clap(short = 'i', long = "inputs")]
     pub inputs: Vec<String>,
 
+    /// Output raw JSON
+    #[clap(short = 'j', long = "json", default_value = "false")]
+    pub json: bool,
+
     /// Output file. Optional.
     ///
     /// The result is always shown in stdout. This option write the result to the file.
@@ -32,7 +41,7 @@ pub struct DataFusionArgs {
 
     /// If Output argument file exists, force to remove.
     #[clap(short = 'r', long = "remove", default_value = "false")]
-    pub remove: bool
+    pub remove: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -79,25 +88,27 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
     }
 }
 
-pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
-    let cfg = SessionConfig::new().with_information_schema(true);
-    let ctx = SessionContext::with_config(cfg);
-
-    for (i, input) in dfargs.inputs.iter().enumerate() {
+pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Result<()> {
+    for (i, input) in inputs.iter().enumerate() {
         let table_id = format!("t{}", i);
 
+        // GCS
         if let Ok(url) = Url::parse(input) {
             match url.scheme() {
                 "gs" => {
                     if let Some(bucket_name) = url.host_str() {
+                        let sa = std::env::var("GOOGLE_APPLICATION_CREDENTIALS")?;
                         let gcs = GoogleCloudStorageBuilder::new()
-                            .with_service_account_path(std::env::var("GOOGLE_APPLICATION_CREDENTIALS")?)
+                            .with_service_account_path(sa)
                             .with_bucket_name(bucket_name)
                             .build()?;
-                    ctx.runtime_env()
-                        .register_object_store(url.scheme(), bucket_name, Arc::new(gcs));
+                        ctx.runtime_env().register_object_store(
+                            url.scheme(),
+                            bucket_name,
+                            Arc::new(gcs),
+                        );
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -123,10 +134,34 @@ pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
             anyhow::bail!(DFError::UnsupportFileFormat)
         }
     }
+    Ok(())
+}
+
+pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
+    let cfg = SessionConfig::new().with_information_schema(true);
+    let ctx = SessionContext::with_config(cfg);
+
+    register_source(&ctx, dfargs.inputs).await?;
+
+    ctx.register_udf(udf_pow());
+
     match dfargs.datafusion_sub_command {
         DataFusionSubCommand::Query(args) => {
             let df = ctx.sql(&args.query).await?;
-            df.clone().show().await?;
+            if dfargs.json {
+                let batches = df.clone().collect().await?;
+                let mut writer = io::BufWriter::new(io::stdout());
+                for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&batches[..])?
+                    .into_iter()
+                    .map(|val| serde_json::from_value(serde_json::Value::Object(val)))
+                    .take_while(|val| val.is_ok())
+                {
+                    writer.write(serde_json::to_string::<serde_json::Value>(&d?)?.as_bytes())?;
+                    writer.write("\n".as_bytes())?;
+                }
+            } else {
+                df.clone().show().await?;
+            }
             if let Some(output) = dfargs.output {
                 write_file(df, output, dfargs.remove).await?;
             }
