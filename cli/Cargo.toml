@@ -16,8 +16,12 @@ json_to_table = "*"
 url = "^2"
 
 gcprs = { path = "../" }
-datafusion = "18.0.0"
+datafusion = "*"
 thiserror = "1.0.38"
 object_store = { version = "0.5.4", features = ["gcp"] }
-datafusion-common = "18.0.0"
-datafusion-expr = "18.0.0"
+datafusion-common = "*"
+datafusion-expr = "*"
+linfa = { git = "https://github.com/tmokazaki/linfa.git", branch="features/l2_distance_serde", version = "0.6.1", features = ["serde", "ndarray-linalg"] }
+linfa-clustering = { git = "https://github.com/tmokazaki/linfa.git", branch="features/l2_distance_serde", version = "0.6.1", features = ["ndarray-linalg", "serde"] }
+ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
+linfa-nn = { version = "0.6.1", features = ["serde"] }

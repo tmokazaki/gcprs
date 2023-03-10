@@ -46,8 +46,11 @@ pub struct DataFusionArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum DataFusionSubCommand {
-    /// Query
+    /// Execute query
     Query(QueryArgs),
+
+    /// Show schema
+    Schema(SchemaArgs),
 }
 
 #[derive(Default, Debug, Args)]
@@ -55,6 +58,9 @@ pub struct QueryArgs {
     #[clap(short = 'q', long = "query")]
     query: String,
 }
+
+#[derive(Default, Debug, Args)]
+pub struct SchemaArgs {}
 
 #[derive(Error, Debug)]
 pub enum DFError {
@@ -86,6 +92,11 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
     } else {
         anyhow::bail!(DFError::UnsupportFileFormat)
     }
+}
+
+pub fn session_context() -> SessionContext {
+    let cfg = SessionConfig::new().with_information_schema(true);
+    SessionContext::with_config(cfg)
 }
 
 pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Result<()> {
@@ -137,31 +148,44 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
     Ok(())
 }
 
+pub async fn print_dataframe(df: DataFrame, as_json: bool) -> Result<()> {
+    if as_json {
+        let batches = df.collect().await?;
+        let mut writer = io::BufWriter::new(io::stdout());
+        for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&batches[..])?
+            .into_iter()
+            .map(|val| serde_json::from_value(serde_json::Value::Object(val)))
+            .take_while(|val| val.is_ok())
+        {
+            writer.write(serde_json::to_string::<serde_json::Value>(&d?)?.as_bytes())?;
+            writer.write("\n".as_bytes())?;
+        }
+    } else {
+        df.show().await?;
+    }
+    Ok(())
+}
+
 pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
-    let cfg = SessionConfig::new().with_information_schema(true);
-    let ctx = SessionContext::with_config(cfg);
+    let ctx = session_context();
 
     register_source(&ctx, dfargs.inputs).await?;
 
     ctx.register_udf(udf_pow());
 
     match dfargs.datafusion_sub_command {
+        DataFusionSubCommand::Schema(_args) => {
+            let df = ctx.sql("describe t0").await?;
+
+            print_dataframe(df, dfargs.json).await?;
+
+            Ok(())
+        }
         DataFusionSubCommand::Query(args) => {
             let df = ctx.sql(&args.query).await?;
-            if dfargs.json {
-                let batches = df.clone().collect().await?;
-                let mut writer = io::BufWriter::new(io::stdout());
-                for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&batches[..])?
-                    .into_iter()
-                    .map(|val| serde_json::from_value(serde_json::Value::Object(val)))
-                    .take_while(|val| val.is_ok())
-                {
-                    writer.write(serde_json::to_string::<serde_json::Value>(&d?)?.as_bytes())?;
-                    writer.write("\n".as_bytes())?;
-                }
-            } else {
-                df.clone().show().await?;
-            }
+
+            print_dataframe(df.clone(), dfargs.json).await?;
+
             if let Some(output) = dfargs.output {
                 write_file(df, output, dfargs.remove).await?;
             }

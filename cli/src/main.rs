@@ -1,6 +1,7 @@
 mod bq;
 mod df;
 mod gcs;
+mod ml;
 
 use anyhow;
 use anyhow::Result;
@@ -8,6 +9,7 @@ use bq::{handle as handle_bq, BqArgs};
 use clap::{Parser, Subcommand};
 use df::{handle as handle_datafusion, DataFusionArgs};
 use gcs::{handle as handle_gcs, GcsArgs};
+use ml::{handle as handle_ml, MlArgs};
 
 #[derive(Debug, Subcommand)]
 enum SubCommand {
@@ -17,6 +19,8 @@ enum SubCommand {
     Gcs(GcsArgs),
     /// Execute DataFusion
     DF(DataFusionArgs),
+    /// Execute ML
+    Ml(MlArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -33,5 +37,6 @@ async fn main() -> Result<()> {
         SubCommand::Bq(bqargs) => handle_bq(bqargs).await,
         SubCommand::Gcs(gcsargs) => handle_gcs(gcsargs).await,
         SubCommand::DF(dfargs) => handle_datafusion(dfargs).await,
+        SubCommand::Ml(mlargs) => handle_ml(mlargs).await,
     }
 }

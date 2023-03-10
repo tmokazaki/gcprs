@@ -70,9 +70,9 @@ Options:
 
 - df
 
-Load CSV/new line delimited JSON/Parquet file and query the data using [Apache DataFusion](https://arrow.apache.org/datafusion/).
+Load CSV/new line delimitted JSON/Parquet file and query the data using [Apache DataFusion](https://arrow.apache.org/datafusion/).
 
-Input file will have a special name `t[0..n]` in SQL. For example, if you pass the input like `-i data_1.json -i data_2.json`, the query must be "select * from t0, t1". The `t0` is the first file `data_1.json` and `t1` is the second `data_2.json`.
+Input file will have a special table name like `t[0..n]` in SQL. For example, if you pass the input like `-i data_1.json -i data_2.json`, the query must be "select * from t0, t1". The `t0` is the first file `data_1.json` and `t1` is the second `data_2.json`.
 
 Inpu/Output filename must have extension. Supported extensions are `json`, `csv` and `parquet`.
 
@@ -83,11 +83,75 @@ Execute DataFusion
 Usage: cli df [OPTIONS] <COMMAND>
 
 Commands:
-  query  Query
-  help   Print this message or the help of the given subcommand(s)
+  query
+          Execute query
+  schema
+          Show schema
+  help
+          Print this message or the help of the given subcommand(s)
 
 Options:
-  -i, --inputs <INPUTS>  Input files
-  -o, --output <OUTPUT>  Output file
-  -h, --help             Print help
+  -i, --inputs <INPUTS>
+          Input files.
+
+          You can use glob format for a single table. Multiple tables are also supported. To use it, add `-i <filename>` arguments as you need.
+
+  -j, --json
+          Output raw JSON
+
+  -o, --output <OUTPUT>
+          Output file. Optional.
+
+          The result is always shown in stdout. This option write the result to the file.
+
+  -r, --remove
+          If Output argument file exists, force to remove
+
+  -h, --help
+          Print help (see a summary with '-h')
+```
+
+- ml
+
+Execute machine learning algorithm. Load CSV/new line delimitted JSON/Parquet file and exeucte. Loading file is same as `df` commoand.
+
+The features used by the algorthm are set by column name. If you want to use multiple features, neet to set multiple column arguments. The column must be a numeric data type like UInt16, Float64 etc.
+Result table in stdout has `label` column accordingly.
+
+```
+$ cli ml --help
+Execute ML
+
+Usage: cli ml [OPTIONS] <COMMAND>
+
+Commands:
+  dbscan
+          DBScan
+  kmeans
+          KMeans
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+  -i, --inputs <INPUTS>
+          Input files.
+
+          You can use glob format for a single table. Multiple tables are also supported. To use it, add `-i <filename>` arguments as you need.
+
+  -j, --json
+          Output raw JSON
+
+  -s, --stats
+          Output statistics
+
+  -o, --output <OUTPUT>
+          Output file. Optional.
+
+          The result is always shown in stdout. This option write the result to the file.
+
+  -r, --remove
+          If Output argument file exists, force to remove
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
