@@ -277,10 +277,13 @@ impl BqTableSchema {
             "NUMERIC" => BqType::FLOAT,
             "BOOLEAN" => BqType::BOOLEAN,
             "TIMESTAMP" => BqType::TIMESTAMP,
+            "DATE" => BqType::DATE,
+            "DATETIME" => BqType::DATETIME,
             "RECORD" => BqType::RECORD,
             _ => BqType::UNKNOWN,
         };
-        let mode = match s.mode.as_ref().unwrap().as_str() {
+        let default = String::from("");
+        let mode = match s.mode.as_ref().unwrap_or_else(|| &default).as_str() {
             "REQUIRED" => BqMode::REQUIRED,
             "NULLABLE" => BqMode::NULLABLE,
             "REPEATED" => BqMode::REPEATED,
@@ -324,6 +327,8 @@ pub enum BqType {
     FLOAT,
     BOOLEAN,
     TIMESTAMP,
+    DATE,
+    DATETIME,
     RECORD,
     UNKNOWN,
 }
@@ -347,7 +352,7 @@ impl BqRow {
         );
         BqRow {
             _name_index: name_index,
-            columns: columns,
+            columns,
         }
     }
     pub fn get(&self, key: &str) -> Option<&BqValue> {
@@ -435,13 +440,19 @@ impl BqColumn {
                         .unwrap(),
                     Utc,
                 )),
+                BqType::DATETIME => BqValue::BqDateTime(
+                    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap()
+                ),
+                BqType::DATE => BqValue::BqDate(
+                    NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()
+                ),
                 _ => BqValue::BqNull,
             },
             Value::Number(n) => match schema.type_ {
                 BqType::STRING => BqValue::BqString(n.to_string()),
                 BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
-                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_utc(
+                BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => BqValue::BqTimestamp(DateTime::from_utc(
                     NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
                     Utc,
                 )),
@@ -507,6 +518,10 @@ pub enum BqValue {
     BqBool(bool),
     /// TIMESTAMP
     BqTimestamp(DateTime<Utc>),
+    /// DateTime
+    BqDateTime(NaiveDateTime),
+    /// Date
+    BqDate(NaiveDate),
     /// STRUCT
     BqStruct(BqRow),
     /// REPEATED(Array)
@@ -552,6 +567,8 @@ impl Serialize1 for BqValue {
                 }
                 seq.end()
             }
+            BqValue::BqDateTime(d) => serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S%.6f").to_string()),
+            BqValue::BqDate(d) => serializer.serialize_str(&d.format("%Y-%m-%d").to_string()),
             BqValue::BqNull => serializer.serialize_none(),
         }
     }
@@ -565,6 +582,8 @@ impl string::ToString for BqValue {
             BqValue::BqFloat(n) => format!("{}", n),
             BqValue::BqBool(b) => format!("{}", b),
             BqValue::BqTimestamp(t) => format!("\"{}\"", t),
+            BqValue::BqDateTime(d) => format!("\"{}\"", d.format("%Y-%m-%dT%H:%M:%S%.6f")),
+            BqValue::BqDate(d) => format!("\"{}\"", d.format("%Y-%m-%d")),
             BqValue::BqStruct(rs) => {
                 let rs_str = rs
                     .columns
