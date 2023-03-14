@@ -256,6 +256,8 @@ impl BqTableSchema {
             BqType::INTEGER => Some("INTEGER".to_string()),
             BqType::BOOLEAN => Some("BOOLEAN".to_string()),
             BqType::TIMESTAMP => Some("TIMESTAMP".to_string()),
+            BqType::DATETIME => Some("DATETIME".to_string()),
+            BqType::DATE => Some("DATE".to_string()),
             BqType::RECORD => Some("RECORD".to_string()),
             _ => None,
         };
@@ -441,21 +443,21 @@ impl BqColumn {
                     Utc,
                 )),
                 BqType::DATETIME => BqValue::BqDateTime(
-                    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap()
+                    NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap(),
                 ),
-                BqType::DATE => BqValue::BqDate(
-                    NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()
-                ),
+                BqType::DATE => BqValue::BqDate(NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
                 _ => BqValue::BqNull,
             },
             Value::Number(n) => match schema.type_ {
                 BqType::STRING => BqValue::BqString(n.to_string()),
                 BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
-                BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => BqValue::BqTimestamp(DateTime::from_utc(
-                    NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
-                    Utc,
-                )),
+                BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => {
+                    BqValue::BqTimestamp(DateTime::from_utc(
+                        NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
+                        Utc,
+                    ))
+                }
                 _ => BqValue::BqNull,
             },
             Value::Bool(b) => match schema.type_ {
@@ -567,7 +569,9 @@ impl Serialize1 for BqValue {
                 }
                 seq.end()
             }
-            BqValue::BqDateTime(d) => serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S%.6f").to_string()),
+            BqValue::BqDateTime(d) => {
+                serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S%.6f").to_string())
+            }
             BqValue::BqDate(d) => serializer.serialize_str(&d.format("%Y-%m-%d").to_string()),
             BqValue::BqNull => serializer.serialize_none(),
         }
