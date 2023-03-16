@@ -1,13 +1,13 @@
-mod common;
+pub mod common;
 
 use crate::df::{print_dataframe, register_source, session_context};
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use datafusion::prelude::SessionContext;
 use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::from_slice::FromSlice;
+use datafusion::prelude::SessionContext;
 use linfa::prelude::*;
 use linfa::DatasetBase;
 use linfa_clustering::{Dbscan, KMeans};
@@ -95,7 +95,12 @@ pub struct KmeansArgs {
     save_model_file: Option<String>,
 }
 
-async fn run_kmeans(show_stats: bool, as_json: bool, args: KmeansArgs, ctx: SessionContext) -> Result<()> {
+async fn run_kmeans(
+    show_stats: bool,
+    as_json: bool,
+    args: KmeansArgs,
+    ctx: SessionContext,
+) -> Result<()> {
     let mut base_dataset = common::BaseData::new(args.columns);
     base_dataset.make_dataset(&ctx).await?;
 
@@ -147,7 +152,12 @@ async fn run_kmeans(show_stats: bool, as_json: bool, args: KmeansArgs, ctx: Sess
     Ok(())
 }
 
-async fn run_dbscan(show_stats: bool, as_json: bool, args: DbscanArgs, ctx: SessionContext) -> Result<()> {
+async fn run_dbscan(
+    show_stats: bool,
+    as_json: bool,
+    args: DbscanArgs,
+    ctx: SessionContext,
+) -> Result<()> {
     let mut base_dataset = common::BaseData::new(args.columns);
     base_dataset.make_dataset(&ctx).await?;
 

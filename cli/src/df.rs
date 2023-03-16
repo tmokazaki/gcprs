@@ -64,7 +64,7 @@ pub struct SchemaArgs {}
 
 #[derive(Error, Debug)]
 pub enum DFError {
-    #[error("file extension must be either `json`, `parquet`, `csv`")]
+    #[error("file extension must be either `json` or `njson`(new line delimited json), `parquet`, `csv`")]
     UnsupportFileFormat,
 }
 
@@ -127,9 +127,10 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
         let path = Path::new(input);
         if let Some(input_ex) = path.extension().and_then(OsStr::to_str) {
             match input_ex {
-                "json" => {
-                    ctx.register_json(&table_id, input, NdJsonReadOptions::default())
-                        .await?
+                "json" | "njson" => {
+                    let mut options = NdJsonReadOptions::default();
+                    options.file_extension = input_ex;
+                    ctx.register_json(&table_id, input, options).await?
                 }
                 "parquet" => {
                     ctx.register_parquet(&table_id, input, ParquetReadOptions::default())

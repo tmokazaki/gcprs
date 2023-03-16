@@ -25,3 +25,4 @@ linfa = { git = "https://github.com/tmokazaki/linfa.git", branch="features/l2_di
 linfa-clustering = { git = "https://github.com/tmokazaki/linfa.git", branch="features/l2_distance_serde", version = "0.6.1", features = ["ndarray-linalg", "serde"] }
 ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
 linfa-nn = { version = "0.6.1", features = ["serde"] }
+plotly = { version = "0.8.3", features = ["kaleido", "ndarray"] }

@@ -1,4 +1,5 @@
 mod bq;
+mod chart;
 mod df;
 mod gcs;
 mod ml;
@@ -6,6 +7,7 @@ mod ml;
 use anyhow;
 use anyhow::Result;
 use bq::{handle as handle_bq, BqArgs};
+use chart::{handle as handle_chart, ChartArgs};
 use clap::{Parser, Subcommand};
 use df::{handle as handle_datafusion, DataFusionArgs};
 use gcs::{handle as handle_gcs, GcsArgs};
@@ -21,6 +23,8 @@ enum SubCommand {
     DF(DataFusionArgs),
     /// Execute ML
     Ml(MlArgs),
+    /// Execute Chart
+    Chart(ChartArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -38,5 +42,6 @@ async fn main() -> Result<()> {
         SubCommand::Gcs(gcsargs) => handle_gcs(gcsargs).await,
         SubCommand::DF(dfargs) => handle_datafusion(dfargs).await,
         SubCommand::Ml(mlargs) => handle_ml(mlargs).await,
+        SubCommand::Chart(cargs) => handle_chart(cargs).await,
     }
 }

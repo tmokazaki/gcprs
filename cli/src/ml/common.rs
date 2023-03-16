@@ -1,8 +1,8 @@
 use anyhow::Result;
 use datafusion::arrow::array;
-use datafusion::prelude::{DataFrame, SessionContext};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::prelude::{DataFrame, SessionContext};
 use std::sync::Arc;
 
 macro_rules! get_value {
@@ -69,9 +69,9 @@ impl BaseData {
     }
 
     pub fn fields_to_schema(&self) -> Arc<Schema> {
-        Arc::new(
-            Schema::new(
-                self.fields.iter().map(|f| f.to_owned()).collect()))
+        Arc::new(Schema::new(
+            self.fields.iter().map(|f| f.to_owned()).collect(),
+        ))
     }
 
     pub fn total_rows(&self) -> usize {
