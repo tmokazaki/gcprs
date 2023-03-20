@@ -222,7 +222,7 @@ impl DriveFile {
         }
     }
 
-    fn is_folder(&self) -> bool {
+    pub fn is_folder(&self) -> bool {
         self.mime_type
             .as_ref()
             .map(|mt| mt.eq("application/vnd.google-apps.folder"))

@@ -1,6 +1,6 @@
 # Google Cloud Platform API library
 
-This library supports parts of `bigquery`, `cloud storage`, `sheet` APIs with OAuth2 authentication.
+This library supports parts of `bigquery`, `cloud storage`, `sheet` and `drive` APIs with OAuth2 authentication.
 API return object can serialize/deserialize to/from JSON. To setup OAuth2, please refer to the [Google Document](https://developers.google.com/identity/protocols/oauth2).
 
 ## BigQuery
@@ -29,5 +29,19 @@ You can use following APIs via this library.
 - insert_object
   - insert_string: wrap insert_object function to call with String object
   - insert_file: wrap insert_object function to call with file name
+
+## Drive
+
+You can use following APIs via this library.
+
+- create_file
+- update_file
+- list_files
+- get_file_meta_by_id
+- get_file
+  - get_file_by_id
+- export_file
+  - export_file_by_id
+
 
 ## Spread Sheet
