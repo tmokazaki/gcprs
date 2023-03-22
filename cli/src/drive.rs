@@ -24,6 +24,15 @@ pub struct DriveArgs {
 pub enum DriveSubCommand {
     /// Query drive file
     List(ListArgs),
+
+    /// Upload and create new file in Drive
+    Upload(UploadArgs),
+
+    /// Overwrite existing file with uploading file in Drive
+    Overwrite(OverwriteArgs),
+
+    /// Download a file in Drive
+    Download(DownloadArgs),
 }
 
 #[derive(Default, Debug, Args)]
@@ -31,6 +40,35 @@ pub struct ListArgs {
     /// query. see: https://developers.google.com/drive/api/guides/search-files
     #[clap(short = 'q', long = "query")]
     query: String,
+}
+
+#[derive(Default, Debug, Args)]
+pub struct UploadArgs {
+    /// input file path
+    #[clap(short = 'i', long = "input")]
+    input: String,
+
+    /// parent
+    #[clap(short = 'p', long = "parent")]
+    parent: Option<String>,
+}
+
+#[derive(Default, Debug, Args)]
+pub struct DownloadArgs {
+    /// input file path
+    #[clap(short = 't', long = "target_id")]
+    id: String,
+}
+
+#[derive(Default, Debug, Args)]
+pub struct OverwriteArgs {
+    /// input file path
+    #[clap(short = 't', long = "target_id")]
+    id: String,
+
+    /// input file path
+    #[clap(short = 'i', long = "input")]
+    input: String,
 }
 
 trait TableView {
@@ -119,6 +157,21 @@ pub async fn handle(dargs: DriveArgs) -> Result<()> {
             param.query(&args.query);
             let res = drive.list_files(&param).await?;
             render(&res, dargs.raw)
+        }
+        DriveSubCommand::Upload(args) => {
+            let res = drive
+                .create_file(&args.input, args.parent.map(|p| vec![p]))
+                .await?;
+            render(&vec![res], dargs.raw)
+        }
+        DriveSubCommand::Download(args) => {
+            let res = drive.get_file_by_id(&args.id).await?;
+            render(&vec![res], dargs.raw)
+        }
+        DriveSubCommand::Overwrite(args) => {
+            let meta = drive.get_file_meta_by_id(&args.id).await?;
+            let res = drive.update_file(meta, &args.input).await?;
+            render(&vec![res], dargs.raw)
         }
     }
 }

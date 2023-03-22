@@ -1,6 +1,6 @@
 # Google Cloud Platform API utility
 
-Currently only small parts of `bigquery`, `cloud storage`, `sheet` APIs.
+Currently only small parts of `bigquery`, `cloud storage`, `sheet`, `drive` APIs.
 This library needs OAuth2 user authentication.
 
 ## Cli
@@ -9,17 +9,19 @@ This library needs OAuth2 user authentication.
 
 ```
 $ cli help
-
 Usage: cli <COMMAND>
 
 Commands:
-  bq    Execute BigQuery APIs
-  gcs   Execute GCS APIs
-  df    Execute DataFusion
-  help  Print this message or the help of the given subcommand(s)
+  bq     Execute BigQuery APIs
+  gcs    Execute GCS APIs
+  df     Execute DataFusion
+  ml     Execute ML
+  chart  Execute Chart
+  drive  Execute Drive APIs
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help  Print help information
+  -h, --help  Print help
 ```
 
 - bq
@@ -154,4 +156,24 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+```
+
+- drive
+```
+$ cli drive --help
+Execute Drive APIs
+
+Usage: cli drive [OPTIONS] <COMMAND>
+
+Commands:
+  list       Query drive file
+  upload     Upload and create new file in Drive
+  overwrite  Overwrite existing file with uploading file in Drive
+  download   Download a file in Drive
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -a, --auth_user  Authenticate with user application. otherwise authenticate with service account
+  -r, --raw_json   Output raw JSON
+  -h, --help       Print help
 ```
