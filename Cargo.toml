@@ -29,7 +29,7 @@ hyper-rustls = "^0.23.0"
 yup-oauth2 = "^8.0"
 rayon = "^1.5"
 urlencoding = "1.0.0"
-webbrowser = "0.8.3"
+webbrowser = ">=0.8.3"
 tokio = { version = "^1.0", features = ["full"] }
 
 google-storage1 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
