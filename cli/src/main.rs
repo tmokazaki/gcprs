@@ -1,15 +1,16 @@
 mod bq;
 mod chart;
 mod df;
+mod drive;
 mod gcs;
 mod ml;
 
-use anyhow;
 use anyhow::Result;
 use bq::{handle as handle_bq, BqArgs};
 use chart::{handle as handle_chart, ChartArgs};
 use clap::{Parser, Subcommand};
 use df::{handle as handle_datafusion, DataFusionArgs};
+use drive::{handle as handle_drive, DriveArgs};
 use gcs::{handle as handle_gcs, GcsArgs};
 use ml::{handle as handle_ml, MlArgs};
 
@@ -25,6 +26,8 @@ enum SubCommand {
     Ml(MlArgs),
     /// Execute Chart
     Chart(ChartArgs),
+    /// Execute Drive APIs
+    Drive(DriveArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -43,5 +46,6 @@ async fn main() -> Result<()> {
         SubCommand::DF(dfargs) => handle_datafusion(dfargs).await,
         SubCommand::Ml(mlargs) => handle_ml(mlargs).await,
         SubCommand::Chart(cargs) => handle_chart(cargs).await,
+        SubCommand::Drive(dargs) => handle_drive(dargs).await,
     }
 }

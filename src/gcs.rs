@@ -296,6 +296,11 @@ impl Gcs {
         Ok(objects)
     }
 
+    /// Get object metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - target object name
     pub async fn get_object_metadata(&self, name: String) -> Result<GcsObject> {
         let res = self
             .api

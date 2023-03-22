@@ -197,6 +197,8 @@ pub struct DriveFile {
 
     /// Link to open in the browser
     pub web_view_link: Option<String>,
+
+    pub owners: Option<Vec<String>>,
 }
 
 impl DriveFile {
@@ -210,6 +212,12 @@ impl DriveFile {
         let size = f.size.unwrap_or_else(|| 0);
         let parents = f.parents.as_ref().map(|v| v.clone());
         let web_view_link = f.web_view_link.to_owned();
+        let owners = f.owners.as_ref().map(|o| {
+            o.iter()
+                .filter(|u| u.email_address.is_some())
+                .map(|u| u.email_address.as_ref().unwrap().clone())
+                .collect()
+        });
         DriveFile {
             id,
             name,
@@ -219,6 +227,7 @@ impl DriveFile {
             size,
             parents,
             web_view_link,
+            owners,
         }
     }
 
@@ -236,6 +245,8 @@ impl DriveFile {
         file
     }
 }
+
+const RESPONSE_FIELDS: &str = "id,name,createdTime,modifiedTime,size,mimeType,fileExtension,driveId,parents,webViewLink,owners";
 
 impl Drive {
     pub fn new(auth: &auth::GcpAuth) -> Self {
@@ -268,10 +279,11 @@ impl Drive {
         file.name = Some(String::from(file_name.unwrap()));
         file.mime_type = Some(mime.to_string());
         file.parents = parents.to_owned();
-        let res = self.api.files().create(file)
-            .param(
-                "fields",
-                "id,name,createdTime,modifiedTime,size,mimeType,fileExtension,driveId,parents,webViewLink")
+        let res = self
+            .api
+            .files()
+            .create(file)
+            .param("fields", RESPONSE_FIELDS)
             .upload_resumable(infile, mime)
             .await;
         let result = match res {
@@ -319,10 +331,11 @@ impl Drive {
         let mime = mime_guess::from_path(path).first_or_octet_stream();
         let infile = std::fs::File::open(&content)?;
 
-        let update = self.api.files().update(file, f.id.as_ref().unwrap())
-            .param(
-                "fields",
-                "id,name,createdTime,modifiedTime,size,mimeType,fileExtension,driveId,parents,webViewLink")
+        let update = self
+            .api
+            .files()
+            .update(file, f.id.as_ref().unwrap())
+            .param("fields", RESPONSE_FIELDS)
             .upload_resumable(infile, mime);
         let res = update.await;
         let result = match res {
@@ -368,12 +381,18 @@ impl Drive {
         &'async_recursion self,
         p: &'async_recursion DriveListParam,
     ) -> Result<Vec<DriveFile>> {
-        let mut list = self.api.files().list()
+        let mut list = self
+            .api
+            .files()
+            .list()
             .corpora("user")
             //.drive_id(&p.drive_id)
             //.include_items_from_all_drives(false)
             //.supports_all_drives(false)
-            .param("fields", "nextPageToken, files(id,name,createdTime,modifiedTime,size,mimeType,fileExtension,driveId,parents,webViewLink)");
+            .param(
+                "fields",
+                &format!("nextPageToken, files({})", RESPONSE_FIELDS),
+            );
         if let Some(query) = &p.query {
             list = list.q(&format!("{} and trashed=false", query));
         } else {
@@ -447,10 +466,7 @@ impl Drive {
             .api
             .files()
             .get(file_id)
-            .param(
-                "fields",
-                "id,name,createdTime,modifiedTime,size,mimeType,fileExtension,driveId,parents,webViewLink",
-            )
+            .param("fields", RESPONSE_FIELDS)
             .add_scope(Scope::Readonly)
             .doit()
             .await?;
