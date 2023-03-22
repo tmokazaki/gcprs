@@ -385,10 +385,10 @@ impl Drive {
             .api
             .files()
             .list()
-            .corpora("user")
+            .corpora("allDrives")
             //.drive_id(&p.drive_id)
-            //.include_items_from_all_drives(false)
-            //.supports_all_drives(false)
+            .include_items_from_all_drives(true)
+            .supports_all_drives(true)
             .param(
                 "fields",
                 &format!("nextPageToken, files({})", RESPONSE_FIELDS),
@@ -485,6 +485,18 @@ impl Drive {
         self.get_file(file).await
     }
 
+    pub async fn get_file_stream(&self, file_id: &String) -> Result<hyper::Response<hyper::Body>> {
+        let res = self
+            .api
+            .files()
+            .get(file_id)
+            .param("alt", "media")
+            .add_scope(Scope::Readonly)
+            .doit()
+            .await?;
+        Ok(res.0)
+    }
+
     /// Get(download) file from Drive. The target file may be downloaded and saved locally.
     ///
     /// # Arguments
@@ -493,16 +505,9 @@ impl Drive {
     pub async fn get_file(&self, file: DriveFile) -> Result<DriveFile> {
         anyhow::ensure!(file.id.is_some(), "input file does not have id");
 
-        let res = self
-            .api
-            .files()
-            .get(file.id.as_ref().unwrap())
-            .param("alt", "media")
-            .add_scope(Scope::Readonly)
-            .doit()
-            .await?;
+        let res = self.get_file_stream(file.id.as_ref().unwrap()).await?;
         //println!("{:?}", res);
-        let mut body = res.0.into_body();
+        let mut body = res.into_body();
         let mut f = std::fs::File::create(&file.name).unwrap();
         while let Some(d) = body.data().await {
             f.write_all(&d?)?;
