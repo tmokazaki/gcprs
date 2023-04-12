@@ -1,10 +1,9 @@
+use crate::common::{render, TableView};
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use gcprs::auth;
 use gcprs::drive as libdrive;
 use libdrive::{Drive, DriveFile, DriveListParam};
-use serde::Serialize;
-use tabled::{builder::Builder, Style};
 
 #[derive(Debug, Args)]
 pub struct DriveArgs {
@@ -71,11 +70,6 @@ pub struct OverwriteArgs {
     input: String,
 }
 
-trait TableView {
-    fn columns(&self) -> Vec<String>;
-    fn values(&self) -> Vec<String>;
-}
-
 impl TableView for DriveFile {
     fn columns(&self) -> Vec<String> {
         vec![
@@ -120,30 +114,6 @@ impl TableView for DriveFile {
     }
 }
 
-fn render<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()> {
-    if raw_json {
-        let json_str = serde_json::to_string(&data)?;
-        println!("{}", json_str)
-    } else {
-        let mut builder = Builder::default();
-        let header = if 0 < data.len() {
-            data[0].columns()
-        } else {
-            vec![]
-        };
-        builder.set_columns(header);
-        for pj in data {
-            builder.add_record(pj.values());
-        }
-
-        let mut table = builder.build();
-        table.with(Style::markdown());
-
-        println!("{}", table);
-    }
-    Ok(())
-}
-
 pub async fn handle(dargs: DriveArgs) -> Result<()> {
     let spauth = if dargs.auth_user {
         auth::GcpAuth::from_user_auth().await.unwrap()
@@ -156,22 +126,22 @@ pub async fn handle(dargs: DriveArgs) -> Result<()> {
             let mut param = DriveListParam::new();
             param.query(&args.query);
             let res = drive.list_files(&param).await?;
-            render(&res, dargs.raw)
+            render(&res, dargs.raw, false)
         }
         DriveSubCommand::Upload(args) => {
             let res = drive
                 .create_file(&args.input, args.parent.map(|p| vec![p]))
                 .await?;
-            render(&vec![res], dargs.raw)
+            render(&vec![res], dargs.raw, false)
         }
         DriveSubCommand::Download(args) => {
             let res = drive.get_file_by_id(&args.id).await?;
-            render(&vec![res], dargs.raw)
+            render(&vec![res], dargs.raw, false)
         }
         DriveSubCommand::Overwrite(args) => {
             let meta = drive.get_file_meta_by_id(&args.id).await?;
             let res = drive.update_file(meta, &args.input).await?;
-            render(&vec![res], dargs.raw)
+            render(&vec![res], dargs.raw, false)
         }
     }
 }

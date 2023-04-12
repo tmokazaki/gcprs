@@ -114,8 +114,7 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
                             .with_bucket_name(bucket_name)
                             .build()?;
                         ctx.runtime_env().register_object_store(
-                            url.scheme(),
-                            bucket_name,
+                            &url,
                             Arc::new(gcs),
                         );
                     }

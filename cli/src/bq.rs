@@ -1,15 +1,12 @@
+use crate::common::{render as render2, TableView};
 use anyhow::Result;
 use bigquery::{Bq, BqDataset, BqListParam, BqProject, BqQueryParam, BqRow, BqTable, QueryResult};
 use clap::{Args, Subcommand};
 use gcprs::auth;
 use gcprs::bigquery;
 use json_to_table::{json_to_table, Orientation};
-use serde::Serialize;
 use std::env;
-use std::io;
-use std::io::Write;
-use std::process;
-use tabled::{builder::Builder, Style};
+use tabled::settings::Style;
 
 #[derive(Debug, Args)]
 pub struct BqArgs {
@@ -110,11 +107,6 @@ pub struct QueryArgs {
     query: String,
 }
 
-trait TableView {
-    fn columns(&self) -> Vec<String>;
-    fn values(&self) -> Vec<String>;
-}
-
 impl TableView for BqProject {
     fn columns(&self) -> Vec<String> {
         vec![
@@ -193,45 +185,10 @@ fn render(json_str: String, raw_json: bool) -> Result<()> {
         println!(
             "{}",
             json_to_table(&json_value)
-                .set_style(Style::markdown())
-                .set_object_mode(Orientation::Horizontal)
+                .with(Style::markdown())
+                .object_orientation(Orientation::Row)
                 .to_string()
         );
-    }
-    Ok(())
-}
-
-fn render2<T: TableView + Serialize>(
-    data: &Vec<T>,
-    json: bool,
-    newline_delimited: bool,
-) -> Result<()> {
-    let mut writer = io::BufWriter::new(io::stdout());
-    if json {
-        if newline_delimited {
-            for data in data.iter() {
-                writer.write(serde_json::to_string(&data)?.as_bytes())?;
-                writer.write("\n".as_bytes())?;
-            }
-        } else {
-            writer.write(serde_json::to_string(&data)?.as_bytes())?;
-        }
-    } else {
-        let mut builder = Builder::default();
-        let header = if 0 < data.len() {
-            data[0].columns()
-        } else {
-            vec![]
-        };
-        builder.set_columns(header);
-        for pj in data {
-            builder.add_record(pj.values());
-        }
-
-        let mut table = builder.build();
-        table.with(Style::markdown());
-
-        writer.write(table.to_string().as_bytes())?;
     }
     Ok(())
 }
@@ -243,8 +200,7 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
         match env::var("PROJECT_ID") {
             Ok(project) => project,
             Err(err) => {
-                println!("{}: PROJECT_ID is necessary", err);
-                process::exit(1);
+                anyhow::bail!("{}: PROJECT_ID is necessary", err)
             }
         }
     };

@@ -31,7 +31,7 @@ pub enum DocumentExportMimeType {
     Word,
     OpenDocument,
     RichText,
-    PDF,
+    PDF, // only PDF can set special parameters: https://stackoverflow.com/questions/46088042/margins-parameters-for-google-spreadsheet-export-as-pdf
     PlainText,
     HTML,
     EPUB,

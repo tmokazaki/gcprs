@@ -1,10 +1,9 @@
+use crate::common::{render, TableView};
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use gcprs::auth;
 use gcprs::gcs as libgcs;
 use libgcs::{Gcs, GcsListParam, GcsObject};
-use serde::Serialize;
-use tabled::{builder::Builder, Style};
 use url::Url;
 
 #[derive(Debug, Args)]
@@ -58,11 +57,6 @@ pub struct UploadArgs {
     name: String,
 }
 
-trait TableView {
-    fn columns(&self) -> Vec<String>;
-    fn values(&self) -> Vec<String>;
-}
-
 impl TableView for GcsObject {
     fn columns(&self) -> Vec<String> {
         vec![
@@ -104,30 +98,6 @@ impl TableView for GcsObject {
     }
 }
 
-fn render<T: TableView + Serialize>(data: &Vec<T>, raw_json: bool) -> Result<()> {
-    if raw_json {
-        let json_str = serde_json::to_string(&data)?;
-        println!("{}", json_str)
-    } else {
-        let mut builder = Builder::default();
-        let header = if 0 < data.len() {
-            data[0].columns()
-        } else {
-            vec![]
-        };
-        builder.set_columns(header);
-        for pj in data {
-            builder.add_record(pj.values());
-        }
-
-        let mut table = builder.build();
-        table.with(Style::markdown());
-
-        println!("{}", table);
-    }
-    Ok(())
-}
-
 pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
     let spauth = if gcsargs.auth_user {
         auth::GcpAuth::from_user_auth().await.unwrap()
@@ -148,11 +118,11 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
             let mut params = GcsListParam::new();
             params.prefix(&path);
             let data = cloud_storage.list_objects(&params).await?;
-            render(&data, gcsargs.raw)
+            render(&data, gcsargs.raw, false)
         }
         GcsSubCommand::ObjectMetadata(args) => {
             let data = cloud_storage.get_object_metadata(args.name).await?;
-            render(&vec![data], gcsargs.raw)
+            render(&vec![data], gcsargs.raw, false)
         }
         GcsSubCommand::Get(args) => {
             let mut object = GcsObject::new(bucket, args.name);
@@ -169,7 +139,7 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
         GcsSubCommand::UploadFile(args) => {
             let object = GcsObject::new(bucket, args.name);
             let result = cloud_storage.insert_file(&object, args.file, None).await?;
-            render(&vec![result], gcsargs.raw)
+            render(&vec![result], gcsargs.raw, false)
         }
     }
 }

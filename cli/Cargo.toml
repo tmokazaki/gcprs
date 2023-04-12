@@ -26,3 +26,4 @@ linfa-clustering = { git = "https://github.com/tmokazaki/linfa.git", branch="fea
 ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
 linfa-nn = { version = "0.6.1", features = ["serde"] }
 plotly = { version = "0.8.3", features = ["kaleido", "ndarray"] }
+lindera = { version = "0.23.0", features = ["ipadic"] }
