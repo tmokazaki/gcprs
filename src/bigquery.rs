@@ -3,9 +3,11 @@ use bigquery::api::{
     JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
     TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema,
 };
-use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
+use bigquery::{Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
+use hyper;
+use hyper_rustls;
 
 use anyhow;
 use anyhow::Result;
