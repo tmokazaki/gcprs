@@ -260,6 +260,7 @@ impl BqTableSchema {
             BqType::TIMESTAMP => Some("TIMESTAMP".to_string()),
             BqType::DATETIME => Some("DATETIME".to_string()),
             BqType::DATE => Some("DATE".to_string()),
+            BqType::TIME=> Some("TIME".to_string()),
             BqType::RECORD => Some("RECORD".to_string()),
             _ => None,
         };
@@ -283,6 +284,7 @@ impl BqTableSchema {
             "TIMESTAMP" => BqType::TIMESTAMP,
             "DATE" => BqType::DATE,
             "DATETIME" => BqType::DATETIME,
+            "TIME" => BqType::TIME,
             "RECORD" => BqType::RECORD,
             _ => BqType::UNKNOWN,
         };
@@ -332,6 +334,7 @@ pub enum BqType {
     BOOLEAN,
     TIMESTAMP,
     DATE,
+    TIME,
     DATETIME,
     RECORD,
     UNKNOWN,
@@ -448,6 +451,8 @@ impl BqColumn {
                     NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap(),
                 ),
                 BqType::DATE => BqValue::BqDate(NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
+                BqType::TIME=> BqValue::BqTime(NaiveTime::parse_from_str(&s, "%H:%M:%S")
+                    .unwrap_or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S.%f").unwrap())),
                 _ => BqValue::BqNull,
             },
             Value::Number(n) => match schema.type_ {
@@ -526,6 +531,8 @@ pub enum BqValue {
     BqDateTime(NaiveDateTime),
     /// Date
     BqDate(NaiveDate),
+    /// Time
+    BqTime(NaiveTime),
     /// STRUCT
     BqStruct(BqRow),
     /// REPEATED(Array)
@@ -575,6 +582,7 @@ impl Serialize1 for BqValue {
                 serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S%.6f").to_string())
             }
             BqValue::BqDate(d) => serializer.serialize_str(&d.format("%Y-%m-%d").to_string()),
+            BqValue::BqTime(d) => serializer.serialize_str(&d.format("%H:%M:%S").to_string()),
             BqValue::BqNull => serializer.serialize_none(),
         }
     }
@@ -590,6 +598,7 @@ impl string::ToString for BqValue {
             BqValue::BqTimestamp(t) => format!("\"{}\"", t),
             BqValue::BqDateTime(d) => format!("\"{}\"", d.format("%Y-%m-%dT%H:%M:%S%.6f")),
             BqValue::BqDate(d) => format!("\"{}\"", d.format("%Y-%m-%d")),
+            BqValue::BqTime(d) => format!("\"{}\"", d.format("%H:%M:%S")),
             BqValue::BqStruct(rs) => {
                 let rs_str = rs
                     .columns
