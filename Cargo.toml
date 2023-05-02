@@ -9,9 +9,9 @@ edition = "2021"
 [workspace]
 members = [
   "cli",
-  "server",
 ]
 exclude = [
+  "server",
   "binpacking_web",
   "shift_web",
 ]
@@ -32,10 +32,10 @@ urlencoding = "1.0.0"
 webbrowser = ">=0.8.3"
 tokio = { version = "^1.0", features = ["full"] }
 
-google-storage1 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
-google-bigquery2 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main" }
-google-sheets4 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
-google-drive3 = { git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
+google-storage1 = "*"#{ git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
+google-bigquery2 = "*"#{ git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main" }
+google-sheets4 = "*"#{ git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
+google-drive3 = "*"#{ git = "https://github.com/tmokazaki/google-apis-rs.git", branch = "main"}
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mime = "0.3.16"
 jsonwebtoken = { version = "8.2.0", features = ["use_pem"] }
