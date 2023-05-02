@@ -6,7 +6,7 @@ use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::{
     CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
-use func::udf_pow;
+use func::{udf_pow, udaf_string_agg};
 use object_store::gcp::GoogleCloudStorageBuilder;
 use std::ffi::OsStr;
 use std::fs::remove_dir_all;
@@ -113,10 +113,7 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
                             .with_service_account_path(sa)
                             .with_bucket_name(bucket_name)
                             .build()?;
-                        ctx.runtime_env().register_object_store(
-                            &url,
-                            Arc::new(gcs),
-                        );
+                        ctx.runtime_env().register_object_store(&url, Arc::new(gcs));
                     }
                 }
                 _ => {}
@@ -172,6 +169,7 @@ pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
     register_source(&ctx, dfargs.inputs).await?;
 
     ctx.register_udf(udf_pow());
+    ctx.register_udaf(udaf_string_agg());
 
     match dfargs.datafusion_sub_command {
         DataFusionSubCommand::Schema(_args) => {
