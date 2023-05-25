@@ -260,7 +260,7 @@ impl BqTableSchema {
             BqType::TIMESTAMP => Some("TIMESTAMP".to_string()),
             BqType::DATETIME => Some("DATETIME".to_string()),
             BqType::DATE => Some("DATE".to_string()),
-            BqType::TIME=> Some("TIME".to_string()),
+            BqType::TIME => Some("TIME".to_string()),
             BqType::RECORD => Some("RECORD".to_string()),
             _ => None,
         };
@@ -451,8 +451,10 @@ impl BqColumn {
                     NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap(),
                 ),
                 BqType::DATE => BqValue::BqDate(NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap()),
-                BqType::TIME=> BqValue::BqTime(NaiveTime::parse_from_str(&s, "%H:%M:%S")
-                    .unwrap_or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S.%f").unwrap())),
+                BqType::TIME => BqValue::BqTime(
+                    NaiveTime::parse_from_str(&s, "%H:%M:%S")
+                        .unwrap_or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S.%f").unwrap()),
+                ),
                 _ => BqValue::BqNull,
             },
             Value::Number(n) => match schema.type_ {

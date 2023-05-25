@@ -1,6 +1,6 @@
 # Google Cloud Platform API library
 
-This library supports parts of `bigquery`, `cloud storage`, `sheet` and `drive` APIs with OAuth2 authentication.
+This library supports parts of `bigquery`, `cloud storage`, `sheet`, `drive` and `pubsub` APIs with OAuth2 authentication.
 API return object can serialize/deserialize to/from JSON. To setup OAuth2, please refer to the [Google Document](https://developers.google.com/identity/protocols/oauth2).
 
 ## BigQuery
@@ -45,3 +45,10 @@ You can use following APIs via this library.
 
 
 ## Spread Sheet
+TBD
+
+## PubSub
+
+- topic_publish
+- subscription_pull
+- subscription_acknowledge
