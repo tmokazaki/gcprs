@@ -1,9 +1,7 @@
 use super::common::error::BadRequest;
 use crate::auth;
-use gcs::{api::Object, Error, Storage};
+use gcs::{api::Object, hyper, Error, Storage};
 use google_storage1 as gcs;
-use hyper;
-use hyper_rustls;
 use mime;
 use std::fs;
 use std::io::Cursor;
@@ -119,7 +117,7 @@ impl GcsObject {
 }
 
 pub struct Gcs {
-    api: Storage<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    api: Storage<auth::HttpsConnector>,
     bucket: String,
 }
 
@@ -192,14 +190,7 @@ impl GcsListParam {
 
 impl Gcs {
     pub fn new(auth: &auth::GcpAuth, bucket: String) -> Gcs {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let api = Storage::new(client, auth.authenticator());
         Gcs { api, bucket }
     }

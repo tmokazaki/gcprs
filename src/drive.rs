@@ -5,20 +5,19 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
 use drive::{
+    hyper,
+    hyper::body::HttpBody,
     api::{File, Scope},
     DriveHub, Error,
 };
 use google_drive3 as drive;
-use hyper;
-use hyper::body::HttpBody;
-use hyper_rustls;
 use mime_guess;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::io::prelude::*;
 
 pub struct Drive {
-    api: DriveHub<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    api: DriveHub<auth::HttpsConnector>,
 }
 
 pub trait Exportable {
@@ -250,14 +249,7 @@ const RESPONSE_FIELDS: &str = "id,name,createdTime,modifiedTime,size,mimeType,fi
 
 impl Drive {
     pub fn new(auth: &auth::GcpAuth) -> Self {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let api = DriveHub::new(client, auth.authenticator());
         Drive { api }
     }

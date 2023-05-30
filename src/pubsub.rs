@@ -1,7 +1,5 @@
 use crate::auth;
 use google_pubsub1 as pubsub;
-use hyper;
-use hyper_rustls;
 use pubsub::{
     api::{AcknowledgeRequest, PublishRequest, PubsubMessage, PullRequest},
     Error, Pubsub, Result as GcpResult,
@@ -14,7 +12,7 @@ use std::time::Duration;
 use std::thread;
 
 pub struct PubSub {
-    api: Pubsub<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    api: Pubsub<auth::HttpsConnector>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,14 +64,7 @@ impl SubscriptionParam {
 
 impl PubSub {
     pub fn new(auth: &auth::GcpAuth) -> Result<PubSub> {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let hub = Pubsub::new(client, auth.authenticator());
         Ok(PubSub { api: hub })
     }

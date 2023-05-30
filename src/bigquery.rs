@@ -6,8 +6,6 @@ use bigquery::api::{
 use bigquery::{Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
-use hyper;
-use hyper_rustls;
 
 use anyhow;
 use anyhow::Result;
@@ -32,7 +30,7 @@ type TableId = String;
 
 pub struct Bq {
     /// BigQuery API endpoint
-    api: Bigquery<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    api: Bigquery<auth::HttpsConnector>,
 
     /// GCP Project ID
     project: ProjectId,
@@ -642,14 +640,7 @@ impl BqTable {
 
 impl Bq {
     pub fn new(auth: &auth::GcpAuth, project: &str) -> Result<Bq> {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let hub = Bigquery::new(client, auth.authenticator());
         Ok(Bq {
             api: hub,
@@ -666,14 +657,7 @@ impl Bq {
     /// call list_project API.
     /// this will return list of project.
     pub async fn list_project(auth: auth::GcpAuth) -> Result<Vec<BqProject>> {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let hub = Bigquery::new(client, auth.authenticator());
         // TODO: handle nex_page_token
         let res = hub.projects().list().doit().await;

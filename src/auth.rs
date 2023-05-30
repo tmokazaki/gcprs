@@ -14,9 +14,22 @@ use std::future::Future;
 use std::pin::Pin;
 use yup_oauth2 as oauth2;
 
+pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>;
+
 #[derive(Clone)]
 pub struct GcpAuth {
-    auth: Authenticator<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    auth: Authenticator<HttpsConnector>,
+}
+
+pub fn new_client() -> hyper::Client<HttpsConnector> {
+    hyper::Client::builder().build(
+        hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .https_only()
+            .enable_http1()
+            .enable_http2()
+            .build(),
+    )
 }
 
 /// async function to be pinned by the `present_user_url` method of the trait
@@ -52,7 +65,7 @@ impl InstalledFlowDelegate for InstalledFlowBrowserDelegate {
 impl GcpAuth {
     pub fn authenticator(
         &self,
-    ) -> Authenticator<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>> {
+    ) -> Authenticator<HttpsConnector> {
         self.auth.clone()
     }
 

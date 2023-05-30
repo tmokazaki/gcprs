@@ -1,7 +1,5 @@
 use crate::auth;
 use google_sheets4 as sheets4;
-use hyper;
-use hyper_rustls;
 use sheets4::api::ValueRange;
 use sheets4::Sheets;
 
@@ -9,7 +7,7 @@ use anyhow;
 use anyhow::Result;
 
 pub struct SpreadSheet {
-    api: Sheets<hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>>,
+    api: Sheets<auth::HttpsConnector>,
 }
 
 #[derive(Clone, Debug)]
@@ -59,14 +57,7 @@ impl ValueRenderOption {
 
 impl SpreadSheet {
     pub fn new(auth: &auth::GcpAuth) -> Result<SpreadSheet> {
-        let client = hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_only()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        );
+        let client = auth::new_client();
         let hub = Sheets::new(client, auth.authenticator());
         Ok(SpreadSheet { api: hub })
     }
