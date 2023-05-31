@@ -63,9 +63,7 @@ impl InstalledFlowDelegate for InstalledFlowBrowserDelegate {
 }
 
 impl GcpAuth {
-    pub fn authenticator(
-        &self,
-    ) -> Authenticator<HttpsConnector> {
+    pub fn authenticator(&self) -> Authenticator<HttpsConnector> {
         self.auth.clone()
     }
 

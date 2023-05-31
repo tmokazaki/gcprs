@@ -8,8 +8,8 @@ use pubsub::{
 use anyhow;
 use anyhow::Result;
 use async_recursion::async_recursion;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 pub struct PubSub {
     api: Pubsub<auth::HttpsConnector>,

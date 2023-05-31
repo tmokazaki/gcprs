@@ -5,9 +5,9 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
 use drive::{
+    api::{File, Scope},
     hyper,
     hyper::body::HttpBody,
-    api::{File, Scope},
     DriveHub, Error,
 };
 use google_drive3 as drive;

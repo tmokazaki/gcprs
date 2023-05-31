@@ -1521,6 +1521,7 @@ dependencies = [
  "google-bigquery2",
  "google-drive3",
  "google-pubsub1",
+ "google-secretmanager1",
  "google-sheets4",
  "google-storage1",
  "hyper",
@@ -1641,6 +1642,26 @@ name = "google-pubsub1"
 version = "5.0.2+20230119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed27e563fc75ccbab8701043170468a40eaa880c90889d14dc2ed963dc61c86d"
+dependencies = [
+ "anyhow",
+ "google-apis-common",
+ "http",
+ "hyper",
+ "hyper-rustls 0.23.2",
+ "itertools",
+ "mime",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-service",
+ "url 1.7.2",
+]
+
+[[package]]
+name = "google-secretmanager1"
+version = "5.0.2+20230114"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "271d7d2af2f7868a40a153d5d79f738b709e209366680bddbbba11bce7005fe5"
 dependencies = [
  "anyhow",
  "google-apis-common",
