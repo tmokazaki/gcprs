@@ -136,6 +136,8 @@ impl PubSub {
         }
     }
 
+    /// publish message to topic
+    ///
     pub async fn publish(&self, p: &PublishParam, data: Vec<u8>) -> Result<Vec<String>> {
         let mut message = PubsubMessage::default();
         message.data = Some(data);
@@ -174,6 +176,8 @@ impl PubSub {
         }
     }
 
+    /// Pull message from subscription
+    ///
     pub async fn pull_subscription<T>(
         &self,
         p: SubscriptionParam,

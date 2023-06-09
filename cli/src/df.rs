@@ -2,11 +2,12 @@ mod func;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::{
     CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
-use func::{udf_pow, udaf_string_agg};
+use func::{udaf_string_agg, udf_pow};
 use object_store::gcp::GoogleCloudStorageBuilder;
 use std::ffi::OsStr;
 use std::fs::remove_dir_all;
@@ -148,8 +149,9 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
 pub async fn print_dataframe(df: DataFrame, as_json: bool) -> Result<()> {
     if as_json {
         let batches = df.collect().await?;
+        let ref_batches: Vec<&RecordBatch> = batches.iter().collect();
         let mut writer = io::BufWriter::new(io::stdout());
-        for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&batches[..])?
+        for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&ref_batches)?
             .into_iter()
             .map(|val| serde_json::from_value(serde_json::Value::Object(val)))
             .take_while(|val| val.is_ok())

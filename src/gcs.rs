@@ -116,11 +116,6 @@ impl GcsObject {
     }
 }
 
-pub struct Gcs {
-    api: Storage<auth::HttpsConnector>,
-    bucket: String,
-}
-
 #[derive(Clone, Debug)]
 pub struct GcsInsertParam {}
 
@@ -130,26 +125,31 @@ impl GcsInsertParam {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct GcsListParam {
+    /// Path prefix
     prefix: Option<String>,
+
+    /// Max result
     max_results: Option<u32>,
+
+    /// Path delimiter
     delimiter: Option<String>,
+
+    /// Next token
+    /// if there are additional pages, need to set the token for the request.
     next_token: Option<String>,
+
+    /// Start offset
     start_offset: Option<String>,
+
+    /// End offset
     end_offset: Option<String>,
 }
 
 impl GcsListParam {
     pub fn new() -> Self {
-        GcsListParam {
-            prefix: Default::default(),
-            max_results: Default::default(),
-            delimiter: Default::default(),
-            next_token: Default::default(),
-            start_offset: Default::default(),
-            end_offset: Default::default(),
-        }
+        Default::default()
     }
 
     pub fn prefix(&mut self, p: &str) -> &mut Self {
@@ -188,6 +188,11 @@ impl GcsListParam {
     }
 }
 
+pub struct Gcs {
+    api: Storage<auth::HttpsConnector>,
+    bucket: String,
+}
+
 impl Gcs {
     pub fn new(auth: &auth::GcpAuth, bucket: String) -> Gcs {
         let client = auth::new_client();
@@ -195,6 +200,11 @@ impl Gcs {
         Gcs { api, bucket }
     }
 
+    /// call objects/list API
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - request parameters
     #[async_recursion]
     pub async fn list_objects(
         &'async_recursion self,

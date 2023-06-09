@@ -5,6 +5,14 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+bigquery = ["google-bigquery2"]
+gcs = ["google-storage1", "mime", "mime_guess"]
+drive = ["google-drive3", "mime_guess"]
+pubsub = ["google-pubsub1"]
+sheets = ["google-sheets4"]
+secretmanager = ["google-secretmanager1"]
 
 [workspace]
 members = [
@@ -19,8 +27,6 @@ exclude = [
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
-itertools = "^0.10"
-ndarray = "^0.15"
 async-recursion = "1.0.0"
 chrono = { version = "^0.4", features = ["serde"] }
 anyhow = { version = "^1.0", features = ["backtrace"] }
@@ -32,16 +38,16 @@ urlencoding = "1.0.0"
 webbrowser = ">0.8.3"
 tokio = { version = "^1.0", features = ["full"] }
 
-google-storage1 = "*"
-google-bigquery2 = "*"
-google-sheets4 = "*"
-google-drive3 = "*"
-google-pubsub1 = "*"
-google-secretmanager1 = "*"
+google-storage1 = { version = "*", optional = true }
+google-bigquery2 = { version = "*", optional = true }
+google-sheets4 = { version = "*", optional = true }
+google-drive3 = { version = "*", optional = true }
+google-pubsub1 = { version = "*", optional = true }
+google-secretmanager1 = { version = "*", optional = true }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-mime = "0.3.16"
+mime = { version = "0.3.16", optional = true }
 jsonwebtoken = { version = "8.2.0", features = ["use_pem"] }
-mime_guess = "2.0.4"
+mime_guess = { version = "2.0.4", optional = true }
 
 [dev-dependencies]
 speculate = "*"

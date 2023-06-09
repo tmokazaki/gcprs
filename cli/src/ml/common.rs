@@ -70,7 +70,7 @@ impl BaseData {
 
     pub fn fields_to_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(
-            self.fields.iter().map(|f| f.to_owned()).collect(),
+            self.fields.iter().map(|f| f.to_owned()).collect::<Vec<_>>(),
         ))
     }
 
