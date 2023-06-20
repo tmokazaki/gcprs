@@ -1,7 +1,8 @@
 use crate::auth;
 use bigquery::api::{
-    JsonObject, JsonValue, QueryRequest, Table, TableCell, TableDataInsertAllRequest,
-    TableDataInsertAllRequestRows, TableFieldSchema, TableReference, TableRow, TableSchema,
+    Job, JobConfiguration, JobConfigurationQuery, JsonObject, JsonValue, QueryRequest, Table,
+    TableCell, TableDataInsertAllRequest, TableDataInsertAllRequestRows, TableFieldSchema,
+    TableReference, TableRow, TableSchema,
 };
 use bigquery::{Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
@@ -91,12 +92,113 @@ impl BqGetQueryResultParam {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Default)]
+pub enum JobStatus {
+    Running,
+    Done,
+    Pending,
+    #[default]
+    Unknown,
+}
+
+impl JobStatus {
+    fn to_status(status: &str) -> Self {
+        match status {
+            "DONE" => JobStatus::Done,
+            "PENDING" => JobStatus::Pending,
+            "RUNNING" => JobStatus::Running,
+            _ => JobStatus::Unknown,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct BqJobResult {
+    pub self_link: Option<String>,
+    pub job_id: Option<String>,
+    pub status: JobStatus,
+    pub error_message: Option<String>,
+    pub error_reason: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub enum WriteDisposition {
+    Truncate,
+    Append,
+    Empty,
+}
+
+#[derive(Clone, Debug)]
+pub enum JobPriority {
+    Interactive,
+    Batch,
+}
+
+#[derive(Clone, Debug)]
+pub struct BqQueryToTableParam {
+    query: String,
+    table_ref: TableReference,
+    use_legacy_sql: bool,
+    dry_run: bool,
+    priority: JobPriority,
+    write_disposition: WriteDisposition,
+}
+
+impl BqQueryToTableParam {
+    pub fn new(project: &str, dataset: &str, table: &str, query: &String) -> Self {
+        let mut table_ref = TableReference::default();
+        table_ref.project_id = Some(project.to_string());
+        table_ref.dataset_id = Some(dataset.to_string());
+        table_ref.table_id = Some(table.to_string());
+        BqQueryToTableParam {
+            query: query.to_owned(),
+            table_ref,
+            use_legacy_sql: false,
+            dry_run: false,
+            priority: JobPriority::Interactive,
+            write_disposition: WriteDisposition::Empty,
+        }
+    }
+
+    pub fn use_legacy_sql(&mut self, legacy_sql: bool) -> &mut Self {
+        self.use_legacy_sql = legacy_sql;
+        self
+    }
+
+    pub fn dry_run(&mut self, dry_run: bool) -> &mut Self {
+        self.dry_run = dry_run;
+        self
+    }
+
+    pub fn write_disposition(&mut self, write_disposition: WriteDisposition) -> &mut Self {
+        self.write_disposition = write_disposition;
+        self
+    }
+
+    fn to_query_config(&self) -> JobConfigurationQuery {
+        let mut req = JobConfigurationQuery::default();
+        req.query = Some(self.query.clone());
+        req.destination_table = Some(self.table_ref.clone());
+        req.priority = match self.priority {
+            JobPriority::Batch => Some(String::from("BATCH")),
+            JobPriority::Interactive => Some(String::from("INTERACTIVE")),
+        };
+        req.write_disposition = match self.write_disposition {
+            WriteDisposition::Empty => Some(String::from("WRITE_EMPTY")),
+            WriteDisposition::Append => Some(String::from("WRITE_APPEND")),
+            WriteDisposition::Truncate => Some(String::from("WRITE_TRUNCATE")),
+        };
+        req.use_legacy_sql = Some(self.use_legacy_sql);
+        req
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct BqQueryParam {
     _query: String,
     _use_legacy_sql: bool,
     _max_results: u32,
-    _dry_ryn: bool,
+    _dry_run: bool,
 }
 
 impl BqQueryParam {
@@ -105,7 +207,7 @@ impl BqQueryParam {
             _query: query.to_owned(),
             _use_legacy_sql: false,
             _max_results: 1000,
-            _dry_ryn: false,
+            _dry_run: false,
         }
     }
 
@@ -120,7 +222,7 @@ impl BqQueryParam {
     }
 
     pub fn dry_run(&mut self, dry_run: bool) -> &mut Self {
-        self._dry_ryn = dry_run;
+        self._dry_run = dry_run;
         self
     }
 
@@ -129,7 +231,7 @@ impl BqQueryParam {
         req.query = Some(self._query.clone());
         req.max_results = Some(self._max_results);
         req.use_legacy_sql = Some(self._use_legacy_sql);
-        req.dry_run = Some(self._dry_ryn);
+        req.dry_run = Some(self._dry_run);
         req
     }
 }
@@ -639,6 +741,12 @@ impl BqTable {
 }
 
 impl Bq {
+    /// Create BigQuery API interface
+    ///
+    /// # Arguments
+    ///
+    /// * `auth` - Gcp Authentication instance
+    /// * `project` - Project ID
     pub fn new(auth: &auth::GcpAuth, project: &str) -> Result<Bq> {
         let client = auth::new_client();
         let hub = Bigquery::new(client, auth.authenticator());
@@ -978,6 +1086,117 @@ impl Bq {
             .unwrap_or(vec![])
     }
 
+    #[async_recursion]
+    async fn wait_job_done(
+        &'async_recursion self,
+        job_id: &'async_recursion str,
+        retry_count: u64,
+    ) -> Result<()> {
+        let get_api = self.api.jobs().get(&self.project, job_id);
+        let resp = Bq::handle_error(get_api.doit().await);
+        match resp {
+            Ok(result) => {
+                //println!("{:?}", result);
+                let state = result
+                    .1
+                    .status
+                    .map(|st| st.state.map(|state| JobStatus::to_status(&*state)))
+                    .flatten()
+                    .unwrap_or_else(|| JobStatus::Unknown);
+                if state != JobStatus::Done {
+                    let interval = 100 * retry_count.pow(2);
+                    // eprintln!("{}, {}", e, interval);
+                    thread::sleep(Duration::from_millis(interval));
+                    self.wait_job_done(job_id, retry_count + 1).await
+                } else {
+                    Ok(())
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
+        }
+    }
+
+    /// Execute get job and wait until the job's status become 'DONE'
+    ///
+    /// # Arguments
+    ///
+    /// * `job_id` - target job id.
+    pub async fn wait_job_complete(&self, job_id: &str) -> Result<()> {
+        self.wait_job_done(job_id, 0).await
+    }
+
+    /// Execute job query. This will save query results into destination table.
+    ///
+    /// If 'dry_run' parameter is set, result would be the result table schema.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - request parameters.
+    #[async_recursion]
+    pub async fn query_to_table(
+        &'async_recursion self,
+        p: &'async_recursion BqQueryToTableParam,
+    ) -> Result<BqJobResult> {
+        let mut job_ref = JobConfiguration::default();
+        let query = p.to_query_config();
+        job_ref.query = Some(query);
+        if p.dry_run {
+            job_ref.dry_run = Some(p.dry_run);
+        }
+        let mut req = Job::default();
+        req.configuration = Some(job_ref);
+        let query_api = self.api.jobs().insert(req, &self.project);
+        let resp = Bq::handle_error(query_api.doit_without_upload().await);
+        //println!("{:?}", resp);
+        match resp {
+            Ok(result) => {
+                //println!("{:?}", result);
+                if p.dry_run {
+                    let state = result
+                        .1
+                        .status
+                        .map(|st| st.state.map(|state| JobStatus::to_status(&*state)))
+                        .flatten()
+                        .unwrap_or_else(|| JobStatus::Unknown);
+                    let mut result = BqJobResult::default();
+                    result.status = state;
+                    Ok(result)
+                } else {
+                    let self_link = result.1.self_link;
+                    let job_id = result.1.job_reference.map(|jr| jr.job_id).flatten();
+                    let state = result
+                        .1
+                        .status
+                        .map(|st| {
+                            let (message, reason) = if let Some(error_result) = st.error_result {
+                                (error_result.message, error_result.reason)
+                            } else {
+                                (None, None)
+                            };
+                            Some((st.state, message, reason))
+                        })
+                        .flatten();
+                    let status = state
+                        .as_ref()
+                        .map(|s| s.0.as_ref().map(|st| JobStatus::to_status(&*st.clone())))
+                        .flatten()
+                        .unwrap_or_else(|| JobStatus::Unknown);
+                    let error_message = state.as_ref().map(|s| s.1.clone()).flatten();
+                    let error_reason = state.map(|s| s.2).flatten();
+                    let result = BqJobResult {
+                        self_link,
+                        job_id,
+                        status,
+                        error_message,
+                        error_reason,
+                    };
+                    Ok(result)
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!(format!("{}", e))),
+        }
+    }
+
     /// Execute query.
     ///
     /// If 'dry_run' parameter is set, result would be the result table schema.
@@ -996,7 +1215,7 @@ impl Bq {
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
-                if p._dry_ryn {
+                if p._dry_run {
                     let schemas = if let Some(schema) = result.1.schema {
                         self.to_schemas(&schema)
                     } else {
