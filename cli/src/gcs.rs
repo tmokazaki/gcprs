@@ -1,4 +1,4 @@
-use crate::common::{render, TableView};
+use crate::common::{render, OutputFormat, TableView};
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use gcprs::auth;
@@ -118,11 +118,27 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
             let mut params = GcsListParam::new();
             params.prefix(&path);
             let data = cloud_storage.list_objects(&params).await?;
-            render(&data, gcsargs.raw, false)
+            render(
+                &data,
+                if gcsargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
         GcsSubCommand::ObjectMetadata(args) => {
             let data = cloud_storage.get_object_metadata(args.name).await?;
-            render(&vec![data], gcsargs.raw, false)
+            render(
+                &vec![data],
+                if gcsargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
         GcsSubCommand::Get(args) => {
             let mut object = GcsObject::new(bucket, args.name);
@@ -139,7 +155,15 @@ pub async fn handle(gcsargs: GcsArgs) -> Result<()> {
         GcsSubCommand::UploadFile(args) => {
             let object = GcsObject::new(bucket, args.name);
             let result = cloud_storage.insert_file(&object, args.file, None).await?;
-            render(&vec![result], gcsargs.raw, false)
+            render(
+                &vec![result],
+                if gcsargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
     }
 }

@@ -74,7 +74,8 @@ impl BqListParam {
 pub struct BqGetQueryResultParam {
     job_id: String,
     page_token: String,
-    _max_results: u32,
+    max_results: u32,
+    num_result_limit: Option<usize>,
 }
 
 impl BqGetQueryResultParam {
@@ -82,12 +83,18 @@ impl BqGetQueryResultParam {
         BqGetQueryResultParam {
             job_id: job_id.to_owned(),
             page_token: page_token.to_owned(),
-            _max_results: 1000,
+            max_results: 1000,
+            num_result_limit: None,
         }
     }
 
     pub fn max_results(&mut self, max_results: u32) -> &mut Self {
-        self._max_results = max_results;
+        self.max_results = max_results;
+        self
+    }
+
+    pub fn num_result_limit(&mut self, limit: usize) -> &mut Self {
+        self.num_result_limit = Some(limit);
         self
     }
 }
@@ -195,43 +202,50 @@ impl BqQueryToTableParam {
 
 #[derive(Clone, Debug)]
 pub struct BqQueryParam {
-    _query: String,
-    _use_legacy_sql: bool,
-    _max_results: u32,
-    _dry_run: bool,
+    query: String,
+    use_legacy_sql: bool,
+    max_results: u32,
+    num_result_limit: Option<usize>,
+    dry_run: bool,
 }
 
 impl BqQueryParam {
     pub fn new(query: &String) -> Self {
         BqQueryParam {
-            _query: query.to_owned(),
-            _use_legacy_sql: false,
-            _max_results: 1000,
-            _dry_run: false,
+            query: query.to_owned(),
+            use_legacy_sql: false,
+            max_results: 1000,
+            num_result_limit: None,
+            dry_run: false,
         }
     }
 
     pub fn use_legacy_sql(&mut self, legacy_sql: bool) -> &mut Self {
-        self._use_legacy_sql = legacy_sql;
+        self.use_legacy_sql = legacy_sql;
         self
     }
 
     pub fn max_results(&mut self, max_results: u32) -> &mut Self {
-        self._max_results = max_results;
+        self.max_results = max_results;
+        self
+    }
+
+    pub fn num_result_limit(&mut self, limit: usize) -> &mut Self {
+        self.num_result_limit = Some(limit);
         self
     }
 
     pub fn dry_run(&mut self, dry_run: bool) -> &mut Self {
-        self._dry_run = dry_run;
+        self.dry_run = dry_run;
         self
     }
 
     fn to_query_request(&self) -> QueryRequest {
         let mut req = QueryRequest::default();
-        req.query = Some(self._query.clone());
-        req.max_results = Some(self._max_results);
-        req.use_legacy_sql = Some(self._use_legacy_sql);
-        req.dry_run = Some(self._dry_run);
+        req.query = Some(self.query.clone());
+        req.max_results = Some(self.max_results);
+        req.use_legacy_sql = Some(self.use_legacy_sql);
+        req.dry_run = Some(self.dry_run);
         req
     }
 }
@@ -1016,7 +1030,7 @@ impl Bq {
             .jobs()
             .get_query_results(&self.project, &p.job_id)
             .page_token(&p.page_token)
-            .max_results(p._max_results);
+            .max_results(p.max_results);
         let resp = Bq::handle_error(api.doit().await);
         match resp {
             Ok(result) => {
@@ -1033,8 +1047,14 @@ impl Bq {
                                     .unwrap_or("".to_string()),
                                 token,
                             );
-                            param.max_results(p._max_results);
-                            tmp_rows.extend(self.get_query_results(&param).await?);
+                            param.max_results(p.max_results);
+                            if let Some(num_limit) = p.num_result_limit {
+                                if tmp_rows.len() < num_limit {
+                                    tmp_rows.extend(self.get_query_results(&param).await?);
+                                }
+                            } else {
+                                tmp_rows.extend(self.get_query_results(&param).await?);
+                            }
                         }
                         tmp_rows
                     } else {
@@ -1215,7 +1235,7 @@ impl Bq {
         match resp {
             Ok(result) => {
                 //println!("{:?}", result);
-                if p._dry_run {
+                if p.dry_run {
                     let schemas = if let Some(schema) = result.1.schema {
                         self.to_schemas(&schema)
                     } else {
@@ -1237,7 +1257,8 @@ impl Bq {
                                         .unwrap_or("".to_string()),
                                     token,
                                 );
-                                param.max_results(p._max_results);
+                                param.max_results(p.max_results);
+                                p.num_result_limit.map(|l| param.num_result_limit(l));
                                 let resp = self.get_query_results(&param).await;
                                 match resp {
                                     Ok(result) => tmp_rows.extend(result),

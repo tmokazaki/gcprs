@@ -6,7 +6,6 @@ use clap::{Args, Subcommand};
 use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::from_slice::FromSlice;
 use datafusion::prelude::SessionContext;
 use linfa::prelude::*;
 use linfa::DatasetBase;
@@ -131,12 +130,12 @@ async fn run_kmeans(
     let dataset_arr_trans = dataset_arr.reversed_axes();
     let mut columns: Vec<array::ArrayRef> = Vec::new();
     for n in 0..base_dataset.columns().len() {
-        columns.push(Arc::new(array::Float64Array::from_slice(
+        columns.push(Arc::new(array::Float64Array::from(
             dataset_arr_trans.slice(s!(n, ..)).to_vec(),
         )))
     }
     let label_data: Vec<u16> = dataset.targets.iter().map(|v| *v as u16).collect();
-    columns.push(Arc::new(array::UInt16Array::from_slice(label_data)));
+    columns.push(Arc::new(array::UInt16Array::from(label_data)));
     let batch = RecordBatch::try_new(schema, columns)?;
     //println!("{:?}", batch);
 
@@ -181,7 +180,7 @@ async fn run_dbscan(
     let dataset_arr_trans = dataset_arr.reversed_axes();
     let mut columns: Vec<array::ArrayRef> = Vec::new();
     for n in 0..base_dataset.columns().len() {
-        columns.push(Arc::new(array::Float64Array::from_slice(
+        columns.push(Arc::new(array::Float64Array::from(
             dataset_arr_trans.slice(s!(n, ..)).to_vec(),
         )))
     }
@@ -197,7 +196,7 @@ async fn run_dbscan(
             noise += 1;
         }
     }
-    columns.push(Arc::new(array::UInt16Array::from_slice(label_data)));
+    columns.push(Arc::new(array::UInt16Array::from(label_data)));
 
     let batch = RecordBatch::try_new(schema, columns)?;
     //println!("{:?}", batch);

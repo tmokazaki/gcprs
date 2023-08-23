@@ -1,4 +1,4 @@
-use crate::common::{render, TableView};
+use crate::common::{render, OutputFormat, TableView};
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use gcprs::auth;
@@ -126,22 +126,54 @@ pub async fn handle(dargs: DriveArgs) -> Result<()> {
             let mut param = DriveListParam::new();
             param.query(&args.query);
             let res = drive.list_files(&param).await?;
-            render(&res, dargs.raw, false)
+            render(
+                &res,
+                if dargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
         DriveSubCommand::Upload(args) => {
             let res = drive
                 .create_file(&args.input, args.parent.map(|p| vec![p]))
                 .await?;
-            render(&vec![res], dargs.raw, false)
+            render(
+                &vec![res],
+                if dargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
         DriveSubCommand::Download(args) => {
             let res = drive.get_file_by_id(&args.id).await?;
-            render(&vec![res], dargs.raw, false)
+            render(
+                &vec![res],
+                if dargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
         DriveSubCommand::Overwrite(args) => {
             let meta = drive.get_file_meta_by_id(&args.id).await?;
             let res = drive.update_file(meta, &args.input).await?;
-            render(&vec![res], dargs.raw, false)
+            render(
+                &vec![res],
+                if dargs.raw {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Stdout
+                },
+                false,
+            )
         }
     }
 }

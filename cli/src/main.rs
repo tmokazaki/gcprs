@@ -5,7 +5,10 @@ mod df;
 mod drive;
 mod gcs;
 mod ml;
+#[cfg(feature = "text")]
 mod text;
+#[cfg(feature = "text")]
+use text::{handle as handle_text, TextArgs};
 
 use anyhow::Result;
 use bq::{handle as handle_bq, BqArgs};
@@ -15,7 +18,6 @@ use df::{handle as handle_datafusion, DataFusionArgs};
 use drive::{handle as handle_drive, DriveArgs};
 use gcs::{handle as handle_gcs, GcsArgs};
 use ml::{handle as handle_ml, MlArgs};
-use text::{handle as handle_text, TextArgs};
 
 #[derive(Debug, Subcommand)]
 enum SubCommand {
@@ -32,6 +34,7 @@ enum SubCommand {
     /// Execute Drive APIs
     Drive(DriveArgs),
     /// Execute Text
+    #[cfg(feature = "text")]
     Text(TextArgs),
 }
 
@@ -52,6 +55,7 @@ async fn main() -> Result<()> {
         SubCommand::Ml(mlargs) => handle_ml(mlargs).await,
         SubCommand::Chart(cargs) => handle_chart(cargs).await,
         SubCommand::Drive(dargs) => handle_drive(dargs).await,
+        #[cfg(feature = "text")]
         SubCommand::Text(targs) => handle_text(targs).await,
     }
 }

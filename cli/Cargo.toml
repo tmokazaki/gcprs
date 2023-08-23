@@ -4,21 +4,25 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = []
+text = ["lindera"]
 
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
+csv = "1.2.2"
 clap = { version = "^4", features = ["derive"] }
 anyhow = { version = "^1.0", features = ["backtrace"] }
 tokio = { version = "^1.0", features = ["full"] }
-tabled = { version = "*" }
-json_to_table = "*"
+tabled = { version = "0.12", features = ["macros"], default-features = false }
+json_to_table = "0.5"
 url = "^2"
 
 gcprs = { path = "../", features = ["bigquery", "gcs", "drive"] }
 datafusion = "*"
 thiserror = "1.0.38"
-object_store = { version = "0.5.4", features = ["gcp"] }
+object_store = { version = "0.6.1", features = ["gcp"] }
 datafusion-common = "*"
 datafusion-expr = "*"
 linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.6.1", features = ["serde", "ndarray-linalg"] }
@@ -26,4 +30,4 @@ linfa-clustering = { git = "https://github.com/rust-ml/linfa.git", version = "0.
 ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
 linfa-nn = { version = "0.6.1", features = ["serde"] }
 plotly = { version = "0.8.3", features = ["kaleido", "ndarray"] }
-lindera = { version = "0.23.0", features = ["ipadic"] }
+lindera = { version = "0.23.0", features = ["ipadic"], optional=true }
