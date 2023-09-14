@@ -266,6 +266,8 @@ pub async fn handle(bqargs: BqArgs) -> Result<()> {
                 &data,
                 if bqargs.json {
                     OutputFormat::Json
+                } else if bqargs.csv {
+                    OutputFormat::Csv
                 } else {
                     OutputFormat::Stdout
                 },
