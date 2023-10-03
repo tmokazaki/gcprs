@@ -3,9 +3,11 @@ mod func;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::dataframe::DataFrameWriteOptions;
+use datafusion::arrow::csv::WriterBuilder;
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::{
-    CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
+    CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext
 };
 use func::{udaf_string_agg, udf_pow};
 use object_store::gcp::GoogleCloudStorageBuilder;
@@ -75,17 +77,19 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
         if path.exists() && remove {
             remove_dir_all(&filename)?;
         }
+        let write_options = DataFrameWriteOptions::default();
         match output_ex {
             "json" => {
-                df.write_json(&filename).await?;
+                df.write_json(&filename, write_options).await?;
             }
             "parquet" => {
                 // TODO: set some options if necessary
                 let builder = WriterProperties::builder();
-                df.write_parquet(&filename, Some(builder.build())).await?;
+                df.write_parquet(&filename, write_options, Some(builder.build())).await?;
             }
             "csv" => {
-                df.write_csv(&filename).await?;
+                let writer = WriterBuilder::new().has_headers(true);
+                df.write_csv(&filename, write_options, Some(writer)).await?;
             }
             _ => anyhow::bail!(DFError::UnsupportFileFormat),
         };
