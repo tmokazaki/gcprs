@@ -556,7 +556,7 @@ impl BqColumn {
                 BqType::INTEGER => BqValue::BqInteger(s.parse::<i64>().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(s.parse::<f64>().unwrap_or(0.0)),
                 BqType::BOOLEAN => BqValue::BqBool(s == "true"),
-                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_utc(
+                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_naive_utc_and_offset(
                     NaiveDateTime::from_timestamp_opt(s.parse::<f64>().unwrap_or(0.0) as i64, 0)
                         .unwrap(),
                     Utc,
@@ -576,7 +576,7 @@ impl BqColumn {
                 BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
                 BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => {
-                    BqValue::BqTimestamp(DateTime::from_utc(
+                    BqValue::BqTimestamp(DateTime::from_naive_utc_and_offset(
                         NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
                         Utc,
                     ))

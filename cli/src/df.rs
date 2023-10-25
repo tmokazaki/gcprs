@@ -101,7 +101,7 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
 
 pub fn session_context() -> SessionContext {
     let cfg = SessionConfig::new().with_information_schema(true);
-    SessionContext::with_config(cfg)
+    SessionContext::new_with_config(cfg)
 }
 
 pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Result<()> {

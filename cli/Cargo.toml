@@ -25,8 +25,8 @@ thiserror = "1.0.38"
 object_store = { version = "0.7.1", features = ["gcp"] }
 datafusion-common = "*"
 datafusion-expr = "*"
-linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.6.1", features = ["serde", "ndarray-linalg"] }
-linfa-clustering = { git = "https://github.com/rust-ml/linfa.git", version = "0.6.1", features = ["ndarray-linalg", "serde"] }
+linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["serde", "ndarray-linalg"] }
+linfa-clustering = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["ndarray-linalg", "serde"] }
 ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
 linfa-nn = { version = "0.6.1", features = ["serde"] }
 plotly = { version = "0.8.3", features = ["kaleido", "ndarray"] }
