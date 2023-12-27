@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod metadata;
 
 #[cfg(feature = "bigquery")]
 pub mod bigquery;
