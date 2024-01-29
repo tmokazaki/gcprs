@@ -2,6 +2,11 @@ use std::fmt;
 use anyhow::Result;
 use hyper::{Request, Method, Client, client::HttpConnector};
 use serde::{Deserialize, Serialize};
+use std::process::Command;
+use std::str;
+
+#[cfg(test)]
+use mockall::automock;
 
 static METADATA_ROOT: &'static str = "http://metadata.google.internal/computeMetadata/v1/";
 
@@ -66,6 +71,7 @@ pub struct ServiceAccountInfo {
     pub scopes: Vec<String>,
 }
 
+#[cfg_attr(test, automock)]
 impl MetadataApi {
     pub fn new() -> Self {
         MetadataApi {}
@@ -116,9 +122,17 @@ impl MetadataApi {
                 println!("body: {:?}", body);
                 Ok(body)
             },
-            Err(e) => {
-                println!("err: {:?}", e);
-                Err(e.into())
+            Err(_) => {
+                let output = Command::new("gcloud")
+                    .arg("auth")
+                    .arg("print-identity-token")
+                    .output();
+                match output {
+                    Ok(output) =>
+                        Ok(String::from(str::from_utf8(&output.stdout).unwrap().trim())),
+                    Err(e) =>
+                        Err(e.into()),
+                }
             }
         }
     }

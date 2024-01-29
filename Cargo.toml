@@ -52,3 +52,4 @@ mime_guess = { version = "2.0.4", optional = true }
 [dev-dependencies]
 speculate = "*"
 rstest = "*"
+mockall = "0.12.1"
