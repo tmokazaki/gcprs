@@ -10,6 +10,8 @@ pub mod drive;
 pub mod gcs;
 #[cfg(feature = "pubsub")]
 pub mod pubsub;
+#[cfg(feature = "run")]
+pub mod run;
 #[cfg(feature = "secretmanager")]
 pub mod secretmanager;
 #[cfg(feature = "sheets")]

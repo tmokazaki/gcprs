@@ -1,7 +1,7 @@
-use std::fmt;
 use anyhow::Result;
-use hyper::{Request, Method, Client, client::HttpConnector};
+use hyper::{client::HttpConnector, Client, Method, Request};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::process::Command;
 use std::str;
 
@@ -56,9 +56,7 @@ impl fmt::Display for CredentialType {
 }
 
 #[derive(Clone)]
-pub struct MetadataApi {
-
-}
+pub struct MetadataApi {}
 
 pub fn new_client() -> hyper::Client<HttpConnector> {
     Client::new()
@@ -78,7 +76,10 @@ impl MetadataApi {
     }
 
     pub async fn service_account_info(&self) -> Result<ServiceAccountInfo> {
-        let url = format!("{}instance/service-accounts/default/?recursive=true", METADATA_ROOT);
+        let url = format!(
+            "{}instance/service-accounts/default/?recursive=true",
+            METADATA_ROOT
+        );
         let client = new_client();
         let req = Request::builder()
             .method(Method::GET)
@@ -95,7 +96,7 @@ impl MetadataApi {
                 let info = serde_json::from_str::<ServiceAccountInfo>(&body)?;
                 // println!("body: {:?}", info);
                 Ok(info)
-            },
+            }
             Err(e) => {
                 println!("err: {:?}", e);
                 Err(e.into())
@@ -104,7 +105,10 @@ impl MetadataApi {
     }
 
     pub async fn generate_id_token(&self, audience: &str) -> Result<String> {
-        let url = format!("{}instance/service-accounts/default/identity?audience={}&format=full", METADATA_ROOT, audience);
+        let url = format!(
+            "{}instance/service-accounts/default/identity?audience={}&format=full",
+            METADATA_ROOT, audience
+        );
         let client = new_client();
         let req = Request::builder()
             .method(Method::GET)
@@ -114,24 +118,22 @@ impl MetadataApi {
             .body(hyper::Body::empty())?;
         // println!("req: {:?}", req);
         let resp = client.request(req).await;
-       //  println!("resp: {:?}", resp);
+        //  println!("resp: {:?}", resp);
         match resp {
             Ok(resp) => {
                 let bytes = hyper::body::to_bytes(resp.into_body()).await?;
                 let body = String::from_utf8(bytes.into_iter().collect())?;
                 println!("body: {:?}", body);
                 Ok(body)
-            },
+            }
             Err(_) => {
                 let output = Command::new("gcloud")
                     .arg("auth")
                     .arg("print-identity-token")
                     .output();
                 match output {
-                    Ok(output) =>
-                        Ok(String::from(str::from_utf8(&output.stdout).unwrap().trim())),
-                    Err(e) =>
-                        Err(e.into()),
+                    Ok(output) => Ok(String::from(str::from_utf8(&output.stdout).unwrap().trim())),
+                    Err(e) => Err(e.into()),
                 }
             }
         }
