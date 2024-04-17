@@ -24,10 +24,9 @@ pub struct GcpAuth {
 pub fn new_client() -> hyper::Client<HttpsConnector> {
     hyper::Client::builder().build(
         hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots()
+            .with_native_roots().unwrap()
             .https_only()
             .enable_http1()
-            .enable_http2()
             .build(),
     )
 }
@@ -142,7 +141,7 @@ fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
 ///
 pub async fn verify_token(token: &String) -> Result<()> {
     let https = hyper_rustls::HttpsConnectorBuilder::new()
-        .with_native_roots()
+        .with_native_roots().unwrap()
         .https_only()
         .enable_http1()
         .build();
