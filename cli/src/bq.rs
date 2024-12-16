@@ -2,7 +2,7 @@ use crate::common::{render as render2, OutputFormat, TableView};
 use anyhow::Result;
 use bigquery::{Bq, BqDataset, BqListParam, BqProject, BqQueryParam, BqRow, BqTable, QueryResult};
 use clap::{Args, Subcommand};
-use gcprs::auth;
+use gcprs::auth_legacy as auth;
 use gcprs::bigquery;
 use json_to_table::{json_to_table, Orientation};
 use std::env;

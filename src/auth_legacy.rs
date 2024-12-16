@@ -1,37 +1,32 @@
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
-use google_iamcredentials1 as iamcredentials1;
-use http_body_util;
-use http_body_util::BodyExt;
-use iamcredentials1::api::GenerateIdTokenRequest;
-use iamcredentials1::{IAMCredentials, hyper_rustls, common::Body};
-pub use iamcredentials1::{yup_oauth2 as oauth2, hyper, hyper_util};
 use jsonwebtoken as jwt;
-pub use oauth2::authenticator::Authenticator;
+use yup_oauth2_legacy as oauth2;
+use oauth2::authenticator::Authenticator;
 use oauth2::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowDelegate};
 use oauth2::{
     authenticator::ApplicationDefaultCredentialsTypes, ApplicationDefaultCredentialsAuthenticator,
     ApplicationDefaultCredentialsFlowOpts,
 };
-use hyper_util::client::legacy::Client;
+use hyper_legacy as hyper;
+use hyper_rustls_legacy as hyper_rustls;
+// use hyper_rustls;
 use std::env;
 use std::future::Future;
 use std::pin::Pin;
 
-pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper::client::connect::HttpConnector>;
 
 #[derive(Clone)]
 pub struct GcpAuth {
     auth: Authenticator<HttpsConnector>,
 }
 
-pub fn new_client() -> Client<HttpsConnector, Body> {
-    Client::builder(
-        hyper_util::rt::TokioExecutor::new()
-    ).build(
+pub fn new_client() -> hyper::Client<HttpsConnector> {
+    hyper::Client::builder().build(
         hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots().unwrap()
-            .https_or_http()
+            .https_only()
             .enable_http1()
             .build(),
     )
@@ -116,30 +111,6 @@ impl GcpAuth {
         Ok(GcpAuth { auth })
     }
 
-    pub async fn generate_id_token(&self) -> Option<String> {
-        let hub = IAMCredentials::new(new_client(), self.authenticator());
-        let req = GenerateIdTokenRequest::default();
-        let name = format!(
-            "projects/-/serviceAccounts/{}",
-            "415279768469-compute@developer.gserviceaccount.com"
-        );
-        let result = hub
-            .projects()
-            .service_accounts_generate_id_token(req, &name)
-            .doit()
-            .await;
-        println!("{:?}", result);
-        match result {
-            Ok((_, response)) => {
-                println!("{:?}", response);
-                return response.token.map(|t| t.clone());
-            }
-            Err(e) => {
-                println!("{:?}", e);
-            }
-        }
-        None
-    }
 }
 
 const GOOGLE_OAUTH2_CERTS_URL: &str = "https://www.googleapis.com/oauth2/v1/certs";
@@ -176,7 +147,7 @@ pub async fn verify_token(token: &String) -> Result<()> {
         .https_only()
         .enable_http1()
         .build();
-    let client = new_client();
+    let client: hyper::Client<_, hyper::Body> = hyper::Client::builder().build(https);
     let uri = GOOGLE_OAUTH2_CERTS_URL.parse().unwrap();
 
     let resp = client.get(uri).await?;
@@ -185,8 +156,8 @@ pub async fn verify_token(token: &String) -> Result<()> {
         anyhow::bail!("Access to secret api failure")
     }
 
-    let bytes = resp.into_body().boxed().collect().await?.to_bytes();
-    let body = String::from_utf8(bytes.into()).expect("response was not valid utf-8");
+    let bytes = hyper::body::to_bytes(resp.into_body()).await?;
+    let body = String::from_utf8(bytes.to_vec()).expect("response was not valid utf-8");
     let public_keys: serde_json::Value = serde_json::from_str(&body).unwrap();
 
     if let Ok(header) = jwt::decode_header(token) {

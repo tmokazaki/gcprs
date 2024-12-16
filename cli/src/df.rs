@@ -2,12 +2,10 @@ mod func;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrameWriteOptions;
-use datafusion::arrow::csv::WriterBuilder;
-use datafusion::parquet::file::properties::WriterProperties;
+use datafusion_common::config::{TableParquetOptions, JsonOptions, CsvOptions};
 use datafusion::prelude::{
-    CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext
+    CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
 use func::{udaf_string_agg, udf_pow};
 use object_store::gcp::GoogleCloudStorageBuilder;
@@ -80,16 +78,19 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
         let write_options = DataFrameWriteOptions::default();
         match output_ex {
             "json" => {
-                df.write_json(&filename, write_options).await?;
+                let options = JsonOptions::default();
+                df.write_json(&filename, write_options, Some(options)).await?;
             }
             "parquet" => {
                 // TODO: set some options if necessary
-                let builder = WriterProperties::builder();
-                df.write_parquet(&filename, write_options, Some(builder.build())).await?;
+                let options = TableParquetOptions::default();
+                df.write_parquet(&filename, write_options, Some(options))
+                    .await?;
             }
             "csv" => {
-                let writer = WriterBuilder::new().has_headers(true);
-                df.write_csv(&filename, write_options, Some(writer)).await?;
+                let mut options = CsvOptions::default();
+                options.has_header = Some(true);
+                df.write_csv(&filename, write_options, Some(options)).await?;
             }
             _ => anyhow::bail!(DFError::UnsupportFileFormat),
         };
@@ -153,16 +154,13 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
 pub async fn print_dataframe(df: DataFrame, as_json: bool) -> Result<()> {
     if as_json {
         let batches = df.collect().await?;
-        let ref_batches: Vec<&RecordBatch> = batches.iter().collect();
+        let mut json_writer = datafusion::arrow::json::ArrayWriter::new(Vec::new());
         let mut writer = io::BufWriter::new(io::stdout());
-        for d in datafusion::arrow::json::writer::record_batches_to_json_rows(&ref_batches)?
-            .into_iter()
-            .map(|val| serde_json::from_value(serde_json::Value::Object(val)))
-            .take_while(|val| val.is_ok())
-        {
-            writer.write(serde_json::to_string::<serde_json::Value>(&d?)?.as_bytes())?;
-            writer.write("\n".as_bytes())?;
+        for batch in batches.iter() {
+            json_writer.write(batch)?;
         }
+        json_writer.finish()?;
+        writer.write_all(&json_writer.into_inner())?;
     } else {
         df.show().await?;
     }

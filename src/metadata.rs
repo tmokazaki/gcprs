@@ -1,7 +1,12 @@
-use std::fmt;
+use crate::auth::{oauth2, hyper_util};
 use anyhow::Result;
-use hyper::{Request, Method, Client, client::HttpConnector};
+use std::convert::Infallible;
+use http_body_util::{Empty, BodyExt};
+use oauth2::hyper_rustls;
+use oauth2::hyper::{body::{Buf, Bytes}, Method, Request};
+use hyper_util::client::legacy::Client;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::process::Command;
 use std::str;
 
@@ -56,12 +61,21 @@ impl fmt::Display for CredentialType {
 }
 
 #[derive(Clone)]
-pub struct MetadataApi {
+pub struct MetadataApi {}
 
-}
+pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
 
-pub fn new_client() -> hyper::Client<HttpConnector> {
-    Client::new()
+pub fn new_client() -> Client<HttpsConnector, http_body_util::combinators::BoxBody<Bytes, Infallible>>
+{
+    Client::builder(
+        hyper_util::rt::TokioExecutor::new()
+    ).build(
+        hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots().unwrap()
+            .https_or_http()
+            .enable_http1()
+            .build(),
+    )
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -78,24 +92,27 @@ impl MetadataApi {
     }
 
     pub async fn service_account_info(&self) -> Result<ServiceAccountInfo> {
-        let url = format!("{}instance/service-accounts/default/?recursive=true", METADATA_ROOT);
+        let url = format!(
+            "{}instance/service-accounts/default/?recursive=true",
+            METADATA_ROOT
+        );
         let client = new_client();
         let req = Request::builder()
             .method(Method::GET)
             .uri(url)
             .header("Metadata-Flavor", "Google")
-            .body(hyper::Body::empty())?;
+            .body(Empty::<Bytes>::new().boxed())?;
         // println!("req: {:?}", req);
         let resp = client.request(req).await;
         // println!("resp: {:?}", resp);
         match resp {
             Ok(resp) => {
-                let bytes = hyper::body::to_bytes(resp.into_body()).await?;
-                let body = String::from_utf8(bytes.into_iter().collect())?;
+                let bytes = resp.into_body().boxed().collect().await?.to_bytes();
+                let body = String::from_utf8(bytes.into())?;
                 let info = serde_json::from_str::<ServiceAccountInfo>(&body)?;
                 // println!("body: {:?}", info);
                 Ok(info)
-            },
+            }
             Err(e) => {
                 println!("err: {:?}", e);
                 Err(e.into())
@@ -104,34 +121,35 @@ impl MetadataApi {
     }
 
     pub async fn generate_id_token(&self, audience: &str) -> Result<String> {
-        let url = format!("{}instance/service-accounts/default/identity?audience={}&format=full", METADATA_ROOT, audience);
+        let url = format!(
+            "{}instance/service-accounts/default/identity?audience={}&format=full",
+            METADATA_ROOT, audience
+        );
         let client = new_client();
         let req = Request::builder()
             .method(Method::GET)
             .uri(url)
             .header("Metadata-Flavor", "Google")
             //.header("x-goog-api-client", format!("{} {} {}", , RequestType::IdToken, CredentialType::ServiceAccountMds))
-            .body(hyper::Body::empty())?;
+            .body(Empty::<Bytes>::new().boxed())?;
         // println!("req: {:?}", req);
         let resp = client.request(req).await;
-       //  println!("resp: {:?}", resp);
+        //  println!("resp: {:?}", resp);
         match resp {
             Ok(resp) => {
-                let bytes = hyper::body::to_bytes(resp.into_body()).await?;
-                let body = String::from_utf8(bytes.into_iter().collect())?;
+                let bytes = resp.into_body().boxed().collect().await?.to_bytes();
+                let body = String::from_utf8(bytes.into())?;
                 println!("body: {:?}", body);
                 Ok(body)
-            },
+            }
             Err(_) => {
                 let output = Command::new("gcloud")
                     .arg("auth")
                     .arg("print-identity-token")
                     .output();
                 match output {
-                    Ok(output) =>
-                        Ok(String::from(str::from_utf8(&output.stdout).unwrap().trim())),
-                    Err(e) =>
-                        Err(e.into()),
+                    Ok(output) => Ok(String::from(str::from_utf8(&output.stdout).unwrap().trim())),
+                    Err(e) => Err(e.into()),
                 }
             }
         }

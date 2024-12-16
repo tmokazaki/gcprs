@@ -1,10 +1,10 @@
-use crate::auth;
+use crate::auth_legacy as auth;
 use bigquery::api::{
     Job, JobConfiguration, JobConfigurationQuery, JsonObject, JsonValue, QueryRequest, Table,
     TableCell, TableDataInsertAllRequest, TableDataInsertAllRequestRows, TableFieldSchema,
     TableReference, TableRow, TableSchema,
 };
-use bigquery::{Bigquery, Error, Result as GcpResult};
+use bigquery::{Bigquery, Error, Result as GcpResult, hyper, hyper_rustls};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
 
@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use std::{string, thread};
+use std::convert::*;
 use uuid::Uuid;
 
 /// Project ID
@@ -376,6 +377,7 @@ impl BqTableSchema {
             BqType::DATE => Some("DATE".to_string()),
             BqType::TIME => Some("TIME".to_string()),
             BqType::RECORD => Some("RECORD".to_string()),
+            BqType::JSON => Some("JSON".to_string()),
             _ => None,
         };
         let fields: Vec<TableFieldSchema> = self
@@ -400,6 +402,7 @@ impl BqTableSchema {
             "DATETIME" => BqType::DATETIME,
             "TIME" => BqType::TIME,
             "RECORD" => BqType::RECORD,
+            "JSON" => BqType::JSON,
             _ => BqType::UNKNOWN,
         };
         let default = String::from("");
@@ -451,6 +454,7 @@ pub enum BqType {
     TIME,
     DATETIME,
     RECORD,
+    JSON,
     UNKNOWN,
 }
 

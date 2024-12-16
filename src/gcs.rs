@@ -1,6 +1,9 @@
 use super::common::error::BadRequest;
 use crate::auth;
 use gcs::{api::Object, hyper, Error, Storage};
+use http_body_util::BodyExt;
+use http_body_util::combinators::BoxBody;
+use hyper::body::Bytes;
 use google_storage1 as gcs;
 use mime;
 use std::fs;
@@ -353,9 +356,8 @@ impl Gcs {
                     .doit()
                     .await?;
                 //println!("{:?}", content);
-                let body = content.0.into_body();
-                let bytes = hyper::body::to_bytes(body).await?;
-                object.content = Some(String::from_utf8(bytes.to_vec())?);
+                let bytes = content.0.into_body().collect().await?.to_bytes();
+                object.content = Some(String::from_utf8(bytes.into())?);
                 Ok(())
             }
             _ => Err(anyhow::anyhow!("there is no object name")),
@@ -367,7 +369,7 @@ impl Gcs {
     /// # Arguments
     ///
     /// * `name` - object name(full path)
-    pub async fn get_object_stream(&self, name: String) -> Result<hyper::Response<hyper::Body>> {
+    pub async fn get_object_stream(&self, name: String) -> Result<hyper::Response<BoxBody<Bytes, hyper::Error>>> {
         let resp = self
             .api
             .objects()
