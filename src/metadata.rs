@@ -1,5 +1,10 @@
+use crate::auth::{oauth2, hyper_util};
 use anyhow::Result;
-use hyper::{client::HttpConnector, Client, Method, Request};
+use std::convert::Infallible;
+use http_body_util::{Empty, BodyExt};
+use oauth2::hyper_rustls;
+use oauth2::hyper::{body::{Buf, Bytes}, Method, Request};
+use hyper_util::client::legacy::Client;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::process::Command;
@@ -58,8 +63,19 @@ impl fmt::Display for CredentialType {
 #[derive(Clone)]
 pub struct MetadataApi {}
 
-pub fn new_client() -> hyper::Client<HttpConnector> {
-    Client::new()
+pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+
+pub fn new_client() -> Client<HttpsConnector, http_body_util::combinators::BoxBody<Bytes, Infallible>>
+{
+    Client::builder(
+        hyper_util::rt::TokioExecutor::new()
+    ).build(
+        hyper_rustls::HttpsConnectorBuilder::new()
+            .with_native_roots().unwrap()
+            .https_or_http()
+            .enable_http1()
+            .build(),
+    )
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -85,14 +101,14 @@ impl MetadataApi {
             .method(Method::GET)
             .uri(url)
             .header("Metadata-Flavor", "Google")
-            .body(hyper::Body::empty())?;
+            .body(Empty::<Bytes>::new().boxed())?;
         // println!("req: {:?}", req);
         let resp = client.request(req).await;
         // println!("resp: {:?}", resp);
         match resp {
             Ok(resp) => {
-                let bytes = hyper::body::to_bytes(resp.into_body()).await?;
-                let body = String::from_utf8(bytes.into_iter().collect())?;
+                let bytes = resp.into_body().boxed().collect().await?.to_bytes();
+                let body = String::from_utf8(bytes.into())?;
                 let info = serde_json::from_str::<ServiceAccountInfo>(&body)?;
                 // println!("body: {:?}", info);
                 Ok(info)
@@ -115,14 +131,14 @@ impl MetadataApi {
             .uri(url)
             .header("Metadata-Flavor", "Google")
             //.header("x-goog-api-client", format!("{} {} {}", , RequestType::IdToken, CredentialType::ServiceAccountMds))
-            .body(hyper::Body::empty())?;
+            .body(Empty::<Bytes>::new().boxed())?;
         // println!("req: {:?}", req);
         let resp = client.request(req).await;
         //  println!("resp: {:?}", resp);
         match resp {
             Ok(resp) => {
-                let bytes = hyper::body::to_bytes(resp.into_body()).await?;
-                let body = String::from_utf8(bytes.into_iter().collect())?;
+                let bytes = resp.into_body().boxed().collect().await?.to_bytes();
+                let body = String::from_utf8(bytes.into())?;
                 println!("body: {:?}", body);
                 Ok(body)
             }

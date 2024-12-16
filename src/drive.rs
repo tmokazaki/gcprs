@@ -3,11 +3,13 @@ use crate::auth;
 use anyhow;
 use anyhow::Result;
 use async_recursion::async_recursion;
+use http_body_util::BodyExt;
+use http_body_util::combinators::BoxBody;
 use chrono::{DateTime, Utc};
 use drive::{
     api::{File, Scope},
     hyper,
-    hyper::body::HttpBody,
+    common::Body,
     DriveHub, Error,
 };
 use google_drive3 as drive;
@@ -477,7 +479,7 @@ impl Drive {
         self.get_file(file).await
     }
 
-    pub async fn get_file_stream(&self, file_id: &String) -> Result<hyper::Response<hyper::Body>> {
+    pub async fn get_file_stream(&self, file_id: &String) -> Result<hyper::Response<Body>> {
         let res = self
             .api
             .files()
@@ -499,11 +501,9 @@ impl Drive {
 
         let res = self.get_file_stream(file.id.as_ref().unwrap()).await?;
         //println!("{:?}", res);
-        let mut body = res.into_body();
         let mut f = std::fs::File::create(&file.name).unwrap();
-        while let Some(d) = body.data().await {
-            f.write_all(&d?)?;
-        }
+        let bytes = res.into_body().collect().await?.to_bytes();
+        f.write_all(&bytes)?;
         Ok(file)
     }
 
@@ -551,12 +551,10 @@ impl Drive {
             .doit()
             .await?;
         //println!("{:?}", res);
-        let mut body = res.into_body();
         let mut f =
             std::fs::File::create(&format!("{}.{}", file.name, mime_type.extension())).unwrap();
-        while let Some(d) = body.data().await {
-            f.write_all(&d?)?;
-        }
+        let bytes = res.into_body().collect().await?.to_bytes();
+        f.write_all(&bytes)?;
         Ok(file)
     }
 }

@@ -4,15 +4,16 @@ use datafusion::arrow::{
 };
 use datafusion::error::Result;
 use datafusion::logical_expr::Volatility;
-use datafusion::physical_plan::{functions::make_scalar_function, Accumulator};
+use datafusion::physical_plan::Accumulator;
 use datafusion::prelude::create_udf;
 use datafusion::scalar::ScalarValue;
 use datafusion_common::cast::as_float64_array;
-use datafusion_expr::{create_udaf, AggregateUDF, ScalarUDF};
+use datafusion_expr::{create_udaf, AggregateUDF, ColumnarValue, ScalarUDF};
 use std::sync::Arc;
 
 pub fn udf_pow() -> ScalarUDF {
-    let pow = make_scalar_function(|args: &[ArrayRef]| {
+    let pow = Arc::new(|args: &[ColumnarValue]| {
+        let args = ColumnarValue::values_to_arrays(args)?;
         let base = as_float64_array(&args[0]).expect("cast failed");
         let exponent = as_float64_array(&args[1]).expect("cast failed");
         let array = base
@@ -23,7 +24,7 @@ pub fn udf_pow() -> ScalarUDF {
                 _ => None,
             })
             .collect::<Float64Array>();
-        Ok(Arc::new(array) as ArrayRef)
+        Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
     });
 
     create_udf(
@@ -31,7 +32,7 @@ pub fn udf_pow() -> ScalarUDF {
         // expects two f64 input args
         vec![DataType::Float64, DataType::Float64],
         // returns f64
-        Arc::new(DataType::Float64),
+        DataType::Float64,
         Volatility::Immutable,
         pow,
     )
@@ -42,7 +43,7 @@ pub fn udaf_string_agg() -> AggregateUDF {
         // the name; used to represent it in plan descriptions and in the registry, to use in SQL.
         "string_agg",
         // the input type; DataFusion guarantees that the first entry of `values` in `update` has this type.
-        DataType::Utf8,
+        vec![DataType::Utf8],
         // the return type; DataFusion expects this to match the type returned by `evaluate`.
         Arc::new(DataType::Utf8),
         Volatility::Immutable,
@@ -74,13 +75,13 @@ impl Accumulator for StringAgg {
     // This function serializes our state to `ScalarValue`, which DataFusion uses
     // to pass this state between execution stages.
     // Note that this can be arbitrary data.
-    fn state(&self) -> Result<Vec<ScalarValue>> {
+    fn state(&mut self) -> Result<Vec<ScalarValue>> {
         Ok(vec![ScalarValue::from(self.string.as_str())])
     }
 
     // DataFusion expects this function to return the final value of this aggregator.
     // in this case, this is the formula of the geometric mean
-    fn evaluate(&self) -> Result<ScalarValue> {
+    fn evaluate(&mut self) -> Result<ScalarValue> {
         Ok(ScalarValue::from(self.string.as_str()))
     }
 
@@ -97,7 +98,8 @@ impl Accumulator for StringAgg {
 
             if let ScalarValue::Utf8(Some(value)) = v {
                 if 0 < self.string.len() {
-                    self.string.push_str(",");
+                    // self.string.push_str(",");
+                    self.string.push_str("\n");
                 }
                 self.string.push_str(&value);
             } else {
@@ -121,7 +123,8 @@ impl Accumulator for StringAgg {
                 .collect::<Result<Vec<_>>>()?;
             if let ScalarValue::Utf8(Some(string)) = &v[0] {
                 if 0 < self.string.len() {
-                    self.string.push_str(",");
+                    // self.string.push_str(",");
+                    self.string.push_str("\n");
                 }
                 self.string.push_str(string);
             } else {
