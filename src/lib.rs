@@ -2,6 +2,8 @@ pub mod auth;
 pub mod auth_legacy;
 pub mod metadata;
 
+#[cfg(feature = "aiplatform")]
+pub mod aiplatform;
 #[cfg(feature = "bigquery")]
 pub mod bigquery;
 pub mod common;
