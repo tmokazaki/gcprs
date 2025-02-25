@@ -3,10 +3,10 @@ mod func;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use datafusion::dataframe::DataFrameWriteOptions;
-use datafusion_common::config::{TableParquetOptions, JsonOptions, CsvOptions};
 use datafusion::prelude::{
     CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
+use datafusion_common::config::{CsvOptions, JsonOptions, TableParquetOptions};
 use func::{udaf_string_agg, udf_pow};
 use object_store::gcp::GoogleCloudStorageBuilder;
 use std::ffi::OsStr;
@@ -79,7 +79,8 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
         match output_ex {
             "json" => {
                 let options = JsonOptions::default();
-                df.write_json(&filename, write_options, Some(options)).await?;
+                df.write_json(&filename, write_options, Some(options))
+                    .await?;
             }
             "parquet" => {
                 // TODO: set some options if necessary
@@ -90,7 +91,8 @@ pub async fn write_file(df: DataFrame, filename: String, remove: bool) -> Result
             "csv" => {
                 let mut options = CsvOptions::default();
                 options.has_header = Some(true);
-                df.write_csv(&filename, write_options, Some(options)).await?;
+                df.write_csv(&filename, write_options, Some(options))
+                    .await?;
             }
             _ => anyhow::bail!(DFError::UnsupportFileFormat),
         };

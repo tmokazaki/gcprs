@@ -3,9 +3,10 @@ use chrono::{TimeZone, Utc};
 use google_iamcredentials1 as iamcredentials1;
 use http_body_util;
 use http_body_util::BodyExt;
+use hyper_util::client::legacy::Client;
 use iamcredentials1::api::GenerateIdTokenRequest;
-use iamcredentials1::{IAMCredentials, hyper_rustls, common::Body};
-pub use iamcredentials1::{yup_oauth2 as oauth2, hyper, hyper_util};
+use iamcredentials1::{common::Body, hyper_rustls, IAMCredentials};
+pub use iamcredentials1::{hyper, hyper_util, yup_oauth2 as oauth2};
 use jsonwebtoken as jwt;
 pub use oauth2::authenticator::Authenticator;
 use oauth2::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowDelegate};
@@ -13,12 +14,12 @@ use oauth2::{
     authenticator::ApplicationDefaultCredentialsTypes, ApplicationDefaultCredentialsAuthenticator,
     ApplicationDefaultCredentialsFlowOpts,
 };
-use hyper_util::client::legacy::Client;
 use std::env;
 use std::future::Future;
 use std::pin::Pin;
 
-pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+pub type HttpsConnector =
+    hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
 
 #[derive(Clone)]
 pub struct GcpAuth {
@@ -26,11 +27,10 @@ pub struct GcpAuth {
 }
 
 pub fn new_client() -> Client<HttpsConnector, Body> {
-    Client::builder(
-        hyper_util::rt::TokioExecutor::new()
-    ).build(
+    Client::builder(hyper_util::rt::TokioExecutor::new()).build(
         hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots().unwrap()
+            .with_native_roots()
+            .unwrap()
             .https_or_http()
             .enable_http1()
             .build(),
@@ -172,7 +172,8 @@ fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
 ///
 pub async fn verify_token(token: &String) -> Result<()> {
     let https = hyper_rustls::HttpsConnectorBuilder::new()
-        .with_native_roots().unwrap()
+        .with_native_roots()
+        .unwrap()
         .https_only()
         .enable_http1()
         .build();

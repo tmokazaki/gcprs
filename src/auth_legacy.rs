@@ -1,15 +1,15 @@
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
+use hyper_legacy as hyper;
+use hyper_rustls_legacy as hyper_rustls;
 use jsonwebtoken as jwt;
-use yup_oauth2_legacy as oauth2;
 use oauth2::authenticator::Authenticator;
 use oauth2::authenticator_delegate::{DefaultInstalledFlowDelegate, InstalledFlowDelegate};
 use oauth2::{
     authenticator::ApplicationDefaultCredentialsTypes, ApplicationDefaultCredentialsAuthenticator,
     ApplicationDefaultCredentialsFlowOpts,
 };
-use hyper_legacy as hyper;
-use hyper_rustls_legacy as hyper_rustls;
+use yup_oauth2_legacy as oauth2;
 // use hyper_rustls;
 use std::env;
 use std::future::Future;
@@ -25,7 +25,8 @@ pub struct GcpAuth {
 pub fn new_client() -> hyper::Client<HttpsConnector> {
     hyper::Client::builder().build(
         hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots().unwrap()
+            .with_native_roots()
+            .unwrap()
             .https_only()
             .enable_http1()
             .build(),
@@ -110,7 +111,6 @@ impl GcpAuth {
 
         Ok(GcpAuth { auth })
     }
-
 }
 
 const GOOGLE_OAUTH2_CERTS_URL: &str = "https://www.googleapis.com/oauth2/v1/certs";
@@ -143,7 +143,8 @@ fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
 ///
 pub async fn verify_token(token: &String) -> Result<()> {
     let https = hyper_rustls::HttpsConnectorBuilder::new()
-        .with_native_roots().unwrap()
+        .with_native_roots()
+        .unwrap()
         .https_only()
         .enable_http1()
         .build();

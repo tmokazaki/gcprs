@@ -4,7 +4,7 @@ use bigquery::api::{
     TableCell, TableDataInsertAllRequest, TableDataInsertAllRequestRows, TableFieldSchema,
     TableReference, TableRow, TableSchema,
 };
-use bigquery::{Bigquery, Error, Result as GcpResult, hyper, hyper_rustls};
+use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
 
@@ -16,9 +16,9 @@ use serde::ser::{Serialize as Serialize1, SerializeMap, SerializeSeq, Serializer
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::convert::*;
 use std::time::Duration;
 use std::{string, thread};
-use std::convert::*;
 use uuid::Uuid;
 
 /// Project ID
