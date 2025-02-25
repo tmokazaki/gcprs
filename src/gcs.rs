@@ -1,10 +1,10 @@
 use super::common::error::BadRequest;
 use crate::auth;
 use gcs::{api::Object, hyper, Error, Storage};
-use http_body_util::BodyExt;
-use http_body_util::combinators::BoxBody;
-use hyper::body::Bytes;
 use google_storage1 as gcs;
+use http_body_util::combinators::BoxBody;
+use http_body_util::BodyExt;
+use hyper::body::Bytes;
 use mime;
 use std::fs;
 use std::io::Cursor;
@@ -369,7 +369,10 @@ impl Gcs {
     /// # Arguments
     ///
     /// * `name` - object name(full path)
-    pub async fn get_object_stream(&self, name: String) -> Result<hyper::Response<BoxBody<Bytes, hyper::Error>>> {
+    pub async fn get_object_stream(
+        &self,
+        name: String,
+    ) -> Result<hyper::Response<BoxBody<Bytes, hyper::Error>>> {
         let resp = self
             .api
             .objects()

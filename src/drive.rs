@@ -3,16 +3,15 @@ use crate::auth;
 use anyhow;
 use anyhow::Result;
 use async_recursion::async_recursion;
-use http_body_util::BodyExt;
-use http_body_util::combinators::BoxBody;
 use chrono::{DateTime, Utc};
 use drive::{
     api::{File, Scope},
-    hyper,
     common::Body,
-    DriveHub, Error,
+    hyper, DriveHub, Error,
 };
 use google_drive3 as drive;
+use http_body_util::combinators::BoxBody;
+use http_body_util::BodyExt;
 use mime_guess;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

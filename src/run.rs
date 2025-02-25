@@ -10,13 +10,15 @@ use cloud_run::{
         GoogleCloudRunV2CloudSqlInstance, GoogleCloudRunV2Container, GoogleCloudRunV2EnvVar,
         GoogleCloudRunV2Execution, GoogleCloudRunV2Job, GoogleCloudRunV2ListExecutionsResponse,
         GoogleCloudRunV2ListJobsResponse, GoogleCloudRunV2ListServicesResponse,
-        GoogleCloudRunV2ResourceRequirements, GoogleCloudRunV2Service, GoogleCloudRunV2Volume,
-        GoogleCloudRunV2VolumeMount, GoogleLongrunningOperation, GoogleCloudRunV2RunJobRequest,
+        GoogleCloudRunV2ResourceRequirements, GoogleCloudRunV2RunJobRequest,
+        GoogleCloudRunV2Service, GoogleCloudRunV2Volume, GoogleCloudRunV2VolumeMount,
+        GoogleLongrunningOperation,
     },
-    CloudRun as GcpCloudRun, Error, Result as GcpResult,
+    hyper, CloudRun as GcpCloudRun, Error, Result as GcpResult,
 };
 use google_run2 as cloud_run;
-use hyper::{Body, Response};
+use http_body_util::combinators::BoxBody;
+use hyper::body::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -205,7 +207,10 @@ impl CloudRun {
     }
 
     fn response_to_service(
-        resp: (Response<Body>, GoogleCloudRunV2Service),
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2Service,
+        ),
     ) -> Result<service::Service> {
         service::Service::from_service(&resp.1)
     }
@@ -225,7 +230,10 @@ impl CloudRun {
     }
 
     fn response_to_list_services(
-        resp: (Response<Body>, GoogleCloudRunV2ListServicesResponse),
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2ListServicesResponse,
+        ),
     ) -> Result<Vec<service::Service>> {
         Ok(resp
             .1
@@ -254,7 +262,12 @@ impl CloudRun {
         CloudRun::handle_error(resp, &CloudRun::response_to_list_services)
     }
 
-    fn response_to_job(resp: (Response<Body>, GoogleCloudRunV2Job)) -> Result<job::Job> {
+    fn response_to_job(
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2Job,
+        ),
+    ) -> Result<job::Job> {
         job::Job::from_job(&resp.1)
     }
 
@@ -269,18 +282,32 @@ impl CloudRun {
         CloudRun::handle_error(resp, &CloudRun::response_to_job)
     }
 
-    fn response_to_operation(resp: (Response<Body>, GoogleLongrunningOperation)) -> Result<()> {
+    fn response_to_operation(
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleLongrunningOperation,
+        ),
+    ) -> Result<()> {
         println!("{:?}", &resp.1);
         Ok(())
     }
 
-    fn response_operation_to_job(resp: (Response<Body>, GoogleLongrunningOperation)) -> Result<job::Job> {
+    fn response_operation_to_job(
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleLongrunningOperation,
+        ),
+    ) -> Result<job::Job> {
         let job_json = serde_json::to_string(&resp.1.metadata.unwrap()).unwrap();
         let j: GoogleCloudRunV2Job = serde_json::from_str(&job_json).unwrap();
         job::Job::from_job(&j)
     }
 
-    pub async fn jobs_create(&self, job_name: &job::RunJobName, job: &job::Job) -> Result<job::Job> {
+    pub async fn jobs_create(
+        &self,
+        job_name: &job::RunJobName,
+        job: &job::Job,
+    ) -> Result<job::Job> {
         let resp = self
             .api
             .projects()
@@ -315,7 +342,10 @@ impl CloudRun {
     }
 
     fn response_to_list_jobs(
-        resp: (Response<Body>, GoogleCloudRunV2ListJobsResponse),
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2ListJobsResponse,
+        ),
     ) -> Result<Vec<job::Job>> {
         Ok(resp
             .1
@@ -341,7 +371,10 @@ impl CloudRun {
     }
 
     fn response_to_execution(
-        resp: (Response<Body>, GoogleCloudRunV2Execution),
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2Execution,
+        ),
     ) -> Result<execution::Execution> {
         execution::Execution::from_execution(&resp.1)
     }
@@ -373,7 +406,10 @@ impl CloudRun {
     }
 
     fn response_to_list_executions(
-        resp: (Response<Body>, GoogleCloudRunV2ListExecutionsResponse),
+        resp: (
+            hyper::Response<BoxBody<Bytes, hyper::Error>>,
+            GoogleCloudRunV2ListExecutionsResponse,
+        ),
     ) -> Result<Vec<execution::Execution>> {
         Ok(resp
             .1

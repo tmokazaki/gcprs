@@ -1,11 +1,14 @@
-use crate::auth::{oauth2, hyper_util};
+use crate::auth::{hyper_util, oauth2};
 use anyhow::Result;
-use std::convert::Infallible;
-use http_body_util::{Empty, BodyExt};
-use oauth2::hyper_rustls;
-use oauth2::hyper::{body::{Buf, Bytes}, Method, Request};
+use http_body_util::{BodyExt, Empty};
 use hyper_util::client::legacy::Client;
+use oauth2::hyper::{
+    body::{Buf, Bytes},
+    Method, Request,
+};
+use oauth2::hyper_rustls;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
 use std::fmt;
 use std::process::Command;
 use std::str;
@@ -63,15 +66,15 @@ impl fmt::Display for CredentialType {
 #[derive(Clone)]
 pub struct MetadataApi {}
 
-pub type HttpsConnector = hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
+pub type HttpsConnector =
+    hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>;
 
-pub fn new_client() -> Client<HttpsConnector, http_body_util::combinators::BoxBody<Bytes, Infallible>>
-{
-    Client::builder(
-        hyper_util::rt::TokioExecutor::new()
-    ).build(
+pub fn new_client(
+) -> Client<HttpsConnector, http_body_util::combinators::BoxBody<Bytes, Infallible>> {
+    Client::builder(hyper_util::rt::TokioExecutor::new()).build(
         hyper_rustls::HttpsConnectorBuilder::new()
-            .with_native_roots().unwrap()
+            .with_native_roots()
+            .unwrap()
             .https_or_http()
             .enable_http1()
             .build(),
