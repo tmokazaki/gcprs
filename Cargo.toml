@@ -14,7 +14,7 @@ pubsub = ["google-pubsub1"]
 sheets = ["google-sheets4"]
 secretmanager = ["google-secretmanager1"]
 run = ["google-run2", "regex"]
-aiplatform = ["google-aiplatform1"]
+aiplatform = ["google-aiplatform1_beta1", "mime_guess"]
 full = ["bigquery", "gcs", "drive", "pubsub", "sheets", "run", "aiplatform"]
 
 [workspace]
@@ -51,7 +51,7 @@ google-pubsub1 = { version = "*", optional = true }
 google-run2 = { version = "*", optional = true }
 google-secretmanager1 = { version = "*", optional = true }
 google-iamcredentials1 = { version = "*" }
-google-aiplatform1 = { version = "*", optional = true }
+google-aiplatform1_beta1 = { version = "*", optional = true }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mime = { version = "0.3.16", optional = true }
 jsonwebtoken = { version = "8.2.0", features = ["use_pem"] }
