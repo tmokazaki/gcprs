@@ -1,18 +1,19 @@
 use crate::auth;
 use aiplatform::{
     api::{
-        GoogleCloudAiplatformV1Content, GoogleCloudAiplatformV1GenerateContentRequest,
-        GoogleCloudAiplatformV1GenerateContentResponse, GoogleCloudAiplatformV1Part,
+        GoogleCloudAiplatformV1beta1Blob, GoogleCloudAiplatformV1beta1Content,
+        GoogleCloudAiplatformV1beta1FileData, GoogleCloudAiplatformV1beta1GenerateContentRequest,
+        GoogleCloudAiplatformV1beta1GenerateContentResponse, GoogleCloudAiplatformV1beta1Part,
+        GoogleCloudAiplatformV1beta1PredictRequest, GoogleCloudAiplatformV1beta1PredictResponse,
     },
-    hyper, Aiplatform, Error, Result as GcpResult,
+    Aiplatform, Error, Result as GcpResult,
 };
-use google_aiplatform1 as aiplatform;
+use google_aiplatform1_beta1 as aiplatform;
 
 use anyhow;
 use anyhow::Result;
-use http_body_util::combinators::BoxBody;
 use http_body_util::BodyExt;
-use hyper::body::Bytes;
+use mime_guess;
 use serde::{Deserialize, Serialize};
 
 pub struct AiPlatform {
@@ -29,6 +30,56 @@ fn publisher_from_model_name(model_name: &str) -> String {
     }
 }
 
+trait PartConverter {
+    fn to_part(&self) -> GoogleCloudAiplatformV1beta1Part;
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateContentFileUri {
+    pub uri: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GenerateContentFileBody {
+    pub body: Vec<u8>,
+    pub mime_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum GenerateContentPart {
+    Text(String),
+    File(GenerateContentFileUri),
+    FileBody(GenerateContentFileBody),
+}
+
+impl PartConverter for GenerateContentPart {
+    fn to_part(&self) -> GoogleCloudAiplatformV1beta1Part {
+        let mut part = GoogleCloudAiplatformV1beta1Part::default();
+        match self {
+            GenerateContentPart::Text(s) => {
+                part.text = Some(s.to_string());
+            }
+            GenerateContentPart::File(f) => {
+                part.file_data = Some(GoogleCloudAiplatformV1beta1FileData {
+                    file_uri: Some(f.uri.to_string()),
+                    mime_type: Some(
+                        mime_guess::from_path(f.uri.clone())
+                            .first_or_text_plain()
+                            .to_string(),
+                    ),
+                });
+            }
+            GenerateContentPart::FileBody(f) => {
+                part.inline_data = Some(GoogleCloudAiplatformV1beta1Blob {
+                    data: Some(f.body.clone()),
+                    mime_type: Some(f.mime_type.to_string()),
+                });
+            }
+        }
+        part
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LlmResponse {
     result: LlmResponseModel,
@@ -39,6 +90,7 @@ pub struct LlmResponse {
 pub enum LlmResponseModel {
     Text(String),
     Image(Vec<u8>),
+    Embeddings(Vec<f32>),
     None,
 }
 
@@ -48,6 +100,80 @@ pub struct TokenInfo {
     prompt_tokens: Option<i32>,
     completion_tokens: Option<i32>,
     total_tokens: Option<i32>,
+}
+
+pub trait EmbedRequest
+where
+    Self: Serialize,
+{
+    /// Converts the current instance into a JSON value that represents
+    /// an embedding request. This is typically used to prepare data
+    /// for embedding operations in AI platforms.
+    fn to_embed_request(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap()
+    }
+}
+
+impl EmbedRequest for TextEmbedRequest {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TextEmbedRequest {
+    content: String,
+    task_type: Option<EmbedTaskType>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EmbedTaskType {
+    SemanticSimilarity,
+    Classification,
+    Clustering,
+    RetrievalDocument,
+    RetrievalQuery,
+    QuestionAnswering,
+    FactVerification,
+    CodeRetrievalQuery,
+}
+
+impl TextEmbedRequest {
+    pub fn new(content: &str, task_type: Option<EmbedTaskType>) -> Self {
+        TextEmbedRequest {
+            content: content.to_string(),
+            task_type,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ImageEmbedRequest {
+    image: Vec<u8>,
+}
+
+impl EmbedRequest for ImageEmbedRequest {}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageEmbedContent {
+    bytes_base64_encoded: Option<String>,
+    gcs_uri: Option<String>,
+    mime_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TokenStatistics {
+    token_count: i32,
+    truncated: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct EmbeddingsContent {
+    statistics: TokenStatistics,
+    values: Vec<f32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PredictResponse {
+    embeddings: EmbeddingsContent,
 }
 
 impl AiPlatform {
@@ -101,24 +227,31 @@ impl AiPlatform {
         }
     }
 
-    pub async fn generate_content(&self, req: &str, model_id: &str) -> Result<LlmResponse> {
-        let mut request = GoogleCloudAiplatformV1GenerateContentRequest::default();
-        let mut part = GoogleCloudAiplatformV1Part::default();
-        part.text = Some(req.to_string());
-        request.contents = Some(vec![GoogleCloudAiplatformV1Content {
+    /// Generates content using the specified model and input parts.
+    /// This asynchronous function takes a vector of `GenerateContentPart`
+    /// and a model identifier, then returns a `Result` containing an
+    /// `LlmResponse` on success or an error on failure.
+    pub async fn generate_content(
+        &self,
+        parts: Vec<GenerateContentPart>,
+        model_id: &str,
+    ) -> Result<LlmResponse> {
+        let mut request = GoogleCloudAiplatformV1beta1GenerateContentRequest::default();
+        request.contents = Some(vec![GoogleCloudAiplatformV1beta1Content {
             role: Some("user".to_string()),
-            parts: Some(vec![part]),
+            parts: Some(parts.iter().map(|p| p.to_part()).collect()),
         }]);
         let result = self
             .api
             .projects()
             .locations_publishers_models_generate_content(request, &self.to_model_name(model_id))
+            //.locations_publishers_models_stream_generate_content(request, &self.to_model_name(model_id))
             .doit()
             .await;
-        println!("{:?}", result);
+        println!("the result {:?}", result);
         match Self::handle_error(result).await {
             Ok(resp) => {
-                let google_resp: GoogleCloudAiplatformV1GenerateContentResponse = resp.1;
+                let google_resp: GoogleCloudAiplatformV1beta1GenerateContentResponse = resp.1;
                 let usage_metadata = google_resp.usage_metadata.unwrap();
                 let token_info = TokenInfo {
                     model_name: model_id.to_string(),
@@ -129,27 +262,57 @@ impl AiPlatform {
                 let llm_resp = LlmResponse {
                     result: google_resp
                         .candidates
-                        .map(|c| {
-                            c[0].content
-                                .as_ref()
-                                .map(|c| {
-                                    c.parts
-                                        .as_ref()
-                                        .map(|ps| {
-                                            ps[0]
-                                                .text
-                                                .as_ref()
-                                                .map(|x| LlmResponseModel::Text(x.clone()))
-                                        })
-                                        .flatten()
-                                })
-                                .flatten()
-                        })
-                        .flatten()
+                        .and_then(|c| c[0].content.clone())
+                        .and_then(|c| c.parts)
+                        .and_then(|ps| ps[0].text.clone())
+                        .map(|x| LlmResponseModel::Text(x.clone()))
                         .unwrap_or(LlmResponseModel::None),
                     token_info,
                 };
                 Ok(llm_resp)
+            }
+            Err(e) => Err(e),
+        }
+    }
+    /// Generates embeddings for the given request using the specified model.
+    /// This asynchronous function accepts a reference to an `EmbedRequest` and
+    /// a model identifier, then returns a `Result` containing an `LlmResponse`
+    /// on success or an error on failure.
+    pub async fn generate_embeddings<T: EmbedRequest>(
+        &self,
+        req: &T,
+        model_id: &str,
+    ) -> Result<LlmResponse> {
+        let mut request = GoogleCloudAiplatformV1beta1PredictRequest::default();
+        request.instances = Some(vec![req.to_embed_request()]);
+        println!("request {:?}", request);
+        let result = self
+            .api
+            .projects()
+            .locations_publishers_models_predict(request, &self.to_model_name(model_id))
+            .doit()
+            .await;
+        // println!("the result {:?}", result);
+        match Self::handle_error(result).await {
+            Ok(resp) => {
+                let google_resp: GoogleCloudAiplatformV1beta1PredictResponse = resp.1;
+                if let Some(predictions) = google_resp.predictions {
+                    let predict: PredictResponse =
+                        serde_json::from_value(predictions[0].clone()).unwrap();
+                    let token_info = TokenInfo {
+                        model_name: model_id.to_string(),
+                        prompt_tokens: Some(predict.embeddings.statistics.token_count),
+                        completion_tokens: Some(0),
+                        total_tokens: Some(predict.embeddings.statistics.token_count),
+                    };
+                    let llm_resp = LlmResponse {
+                        result: LlmResponseModel::Embeddings(predict.embeddings.values),
+                        token_info,
+                    };
+                    Ok(llm_resp)
+                } else {
+                    Err(anyhow::anyhow!("no predictions"))
+                }
             }
             Err(e) => Err(e),
         }
