@@ -20,6 +20,50 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Seek};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GcsBucket {
+    /// Bucket id
+    pub id: Option<String>,
+
+    /// Bucket name
+    pub name: Option<String>,
+
+    /// Location
+    pub location: Option<String>,
+
+    /// Storage class
+    pub storage_class: Option<String>,
+
+    /// Location type
+    pub location_type: Option<String>,
+
+    /// Self link
+    pub self_link: Option<String>,
+
+    /// project number
+    pub project_number: Option<u64>,
+}
+
+impl From<gcs::api::Bucket> for GcsBucket {
+    fn from(bucket: gcs::api::Bucket) -> Self {
+        GcsBucket {
+            id: bucket.id,
+            name: bucket.name,
+            location: bucket.location,
+            storage_class: bucket.storage_class,
+            location_type: bucket.location_type,
+            self_link: bucket.self_link,
+            project_number: bucket.project_number,
+        }
+    }
+}
+
+impl From<&gcs::api::Bucket> for GcsBucket {
+    fn from(bucket: &gcs::api::Bucket) -> Self {
+        GcsBucket::from(bucket.to_owned())
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GcsObject {
     /// Bucket name
     pub bucket: String,
@@ -107,15 +151,24 @@ impl GcsObject {
         }
     }
 
-    pub fn to_object(&self) -> Object {
+}
+
+impl Into<Object> for GcsObject {
+    fn into(self) -> Object {
         let mut object = Object::default();
-        object.name = self.name.as_ref().map(|n| n.to_string());
+        object.name = self.name;
         object.size = self.size;
-        object.content_type = self.content_type.as_ref().map(|c| c.to_string());
-        object.self_link = self.self_link.as_ref().map(|l| l.to_string());
+        object.content_type = self.content_type;
+        object.self_link = self.self_link;
         object.time_created = self.created_at;
         object.updated = self.updated_at;
         object
+    }
+}
+
+impl Into<Object> for &GcsObject {
+    fn into(self) -> Object {
+        self.to_owned().into()
     }
 }
 
@@ -203,6 +256,66 @@ impl Gcs {
         Gcs { api, bucket }
     }
 
+    /// call bucket/list API
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - request parameters
+    #[async_recursion]
+    pub async fn list_buckets(
+        auth: &auth::GcpAuth,
+        project: &str,
+        p: &'async_recursion GcsListParam,
+    ) -> Result<Vec<GcsBucket>> {
+        let client = auth::new_client();
+        let api = Storage::new(client, auth.authenticator());
+
+        let mut gcs = api.buckets().list(project);
+        if let Some(mr) = p.max_results {
+            gcs = gcs.max_results(mr);
+        }
+        if let Some(pf) = &p.prefix {
+            gcs = gcs.prefix(&pf);
+        }
+        if let Some(token) = &p.next_token {
+            gcs = gcs.page_token(&token);
+        }
+        let res = gcs.doit().await;
+        let result = match res {
+            Ok(result) => result,
+            Err(e) => match e {
+                Error::BadRequest(badrequest) => {
+                    if let Ok(br) = serde_json::from_value::<BadRequest>(badrequest.clone()) {
+                        anyhow::bail!(br.request_error())
+                    } else {
+                        anyhow::bail!(badrequest)
+                    }
+                }
+                Error::HttpError(_)
+                | Error::Io(_)
+                | Error::MissingAPIKey
+                | Error::MissingToken(_)
+                | Error::Cancelled
+                | Error::UploadSizeLimitExceeded(_, _)
+                | Error::Failure(_)
+                | Error::FieldClash(_)
+                | Error::JsonDecodeError(_, _) => {
+                    eprintln!("{}", e);
+                    anyhow::bail!(e)
+                }
+            },
+        };
+        if let Some(items) = result.1.items {
+            let mut items = items
+                .par_iter()
+                .map(|item| GcsBucket::from(item))
+                .collect::<Vec<GcsBucket>>();
+            Ok(items)
+        } else {
+            println!("There is no bucket");
+            Ok(vec![])
+        }
+    }
     /// call objects/list API
     ///
     /// # Arguments
@@ -445,7 +558,7 @@ impl Gcs {
         stream: T,
         _p: Option<GcsInsertParam>,
     ) -> Result<GcsObject> {
-        let req = object.to_object();
+        let req: Object = object.into();
         let insert = self.api.objects().insert(req, &self.bucket);
         let mime_type = if let Some(m) = object.get_mime() {
             m
