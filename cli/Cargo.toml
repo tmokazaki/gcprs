@@ -19,10 +19,10 @@ tabled = { version = "0.12", features = ["macros"], default-features = false }
 json_to_table = "0.5"
 url = "^2"
 
-gcprs = { path = "../", features = ["bigquery", "gcs", "drive"] }
+gcprs = { path = "../", features = ["full"] }
 datafusion = "*"
 thiserror = "1.0.38"
-object_store = { version = "^0.11", features = ["gcp"] }
+object_store = { version = "^0.12", features = ["gcp"] }
 datafusion-common = "*"
 datafusion-expr = "*"
 linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["serde", "ndarray-linalg"] }
