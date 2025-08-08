@@ -803,7 +803,7 @@ dependencies = [
  "plotly",
  "serde",
  "serde_json",
- "tabled",
+ "tabled 0.12.2",
  "thiserror 2.0.12",
  "tokio",
  "url 2.5.4",
@@ -2951,12 +2951,12 @@ dependencies = [
 
 [[package]]
 name = "json_to_table"
-version = "0.5.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e233e3750bac7edc04e1e1b03741cd1e37b59a8aff781fbed41cbcca79b2b06e"
+checksum = "ac716ca5dbe0028e41673f0748bc25a048e010960dd6094b3829ef994db73a31"
 dependencies = [
  "serde_json",
- "tabled",
+ "tabled 0.20.0",
 ]
 
 [[package]]
@@ -3854,6 +3854,17 @@ dependencies = [
  "bytecount",
  "fnv",
  "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "papergrid"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6978128c8b51d8f4080631ceb2302ab51e32cc6e8615f735ee2f83fd269ae3f1"
+dependencies = [
+ "bytecount",
+ "fnv",
+ "unicode-width 0.2.1",
 ]
 
 [[package]]
@@ -5169,8 +5180,18 @@ version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce69a5028cd9576063ec1f48edb2c75339fd835e6094ef3e05b3a079bf594a6"
 dependencies = [
- "papergrid",
+ "papergrid 0.9.1",
  "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "tabled"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e39a2ee1fbcd360805a771e1b300f78cc88fec7b8d3e2f71cd37bbf23e725c7d"
+dependencies = [
+ "papergrid 0.17.0",
+ "testing_table",
 ]
 
 [[package]]
@@ -5211,6 +5232,15 @@ name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+
+[[package]]
+name = "testing_table"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f8daae29995a24f65619e19d8d31dea5b389f3d853d8bf297bbf607cd0014cc"
+dependencies = [
+ "unicode-width 0.2.1",
+]
 
 [[package]]
 name = "thiserror"
