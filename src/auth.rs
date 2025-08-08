@@ -147,25 +147,23 @@ const GOOGLE_OAUTH2_CERTS_URL: &str = "https://www.googleapis.com/oauth2/v1/cert
 fn get_iat(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     claim
         .get("iat")
-        .map(|iat| match iat {
+        .and_then(|iat| match iat {
             serde_json::Value::Number(n) => {
                 Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap())
             }
             _ => None,
         })
-        .flatten()
 }
 
 fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     claim
         .get("exp")
-        .map(|iat| match iat {
+        .and_then(|iat| match iat {
             serde_json::Value::Number(n) => {
                 Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap())
             }
             _ => None,
         })
-        .flatten()
 }
 
 /// Verify google jwt identity token
@@ -194,18 +192,17 @@ pub async fn verify_token(token: &String) -> Result<()> {
         //println!("{:?}", header);
         let secret = header
             .kid
-            .map(|kid| match &public_keys.get(kid) {
+            .and_then(|kid| match &public_keys.get(kid) {
                 Some(serde_json::Value::String(s)) => Some(s),
                 _ => None,
             })
-            .flatten()
             .expect("there is no valid key");
 
         let mut validation = jwt::Validation::new(header.alg);
         validation.set_issuer(&["https://accounts.google.com", "accounts.google.com"]);
         validation.set_required_spec_claims(&["aud", "exp", "iss"]);
         let token_message = jwt::decode::<serde_json::Value>(
-            &token,
+            token,
             &jwt::DecodingKey::from_rsa_pem(secret.to_string().as_bytes())?,
             &validation,
         )?;

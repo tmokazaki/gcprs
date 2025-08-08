@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::all)]
     use super::super::*;
     use chrono::{TimeZone, Utc};
     use google_storage1::api::{Bucket, Object};

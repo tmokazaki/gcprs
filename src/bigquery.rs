@@ -4,7 +4,7 @@ use bigquery::api::{
     TableCell, TableDataInsertAllRequest, TableDataInsertAllRequestRows, TableFieldSchema,
     TableReference, TableRow, TableSchema,
 };
-use bigquery::{hyper, hyper_rustls, Bigquery, Error, Result as GcpResult};
+use bigquery::{Bigquery, Error, Result as GcpResult};
 use chrono::prelude::*;
 use google_bigquery2 as bigquery;
 
@@ -240,23 +240,22 @@ impl BqQueryParam {
         self.dry_run = dry_run;
         self
     }
-
 }
 
-impl Into<QueryRequest> for BqQueryParam {
-    fn into(self) -> QueryRequest {
+impl From<BqQueryParam> for QueryRequest {
+    fn from(val: BqQueryParam) -> Self {
         let mut req = QueryRequest::default();
-        req.query = Some(self.query.clone());
-        req.max_results = Some(self.max_results);
-        req.use_legacy_sql = Some(self.use_legacy_sql);
-        req.dry_run = Some(self.dry_run);
+        req.query = Some(val.query.clone());
+        req.max_results = Some(val.max_results);
+        req.use_legacy_sql = Some(val.use_legacy_sql);
+        req.dry_run = Some(val.dry_run);
         req
     }
 }
 
-impl Into<QueryRequest> for &BqQueryParam {
-    fn into(self) -> QueryRequest {
-        self.to_owned().into()
+impl From<&BqQueryParam> for QueryRequest {
+    fn from(val: &BqQueryParam) -> Self {
+        val.to_owned().into()
     }
 }
 
@@ -369,7 +368,7 @@ pub trait BqSchemaBuilder {
 impl BqTableSchema {
     fn to_table_field_schema(&self) -> TableFieldSchema {
         let mut schema = TableFieldSchema::default();
-        schema.name = self.name.as_ref().map(|n| n.clone());
+        schema.name = self.name.clone();
         schema.mode = match self.mode {
             BqMode::REQUIRED => Some("REQUIRED".to_string()),
             BqMode::NULLABLE => Some("NULLABLE".to_string()),
@@ -394,7 +393,7 @@ impl BqTableSchema {
             .iter()
             .map(|f| f.to_table_field_schema())
             .collect();
-        schema.fields = if 0 < fields.len() { Some(fields) } else { None };
+        schema.fields = if !fields.is_empty() { Some(fields) } else { None };
         schema
     }
 
@@ -415,7 +414,7 @@ impl BqTableSchema {
             _ => BqType::UNKNOWN,
         };
         let default = String::from("");
-        let mode = match s.mode.as_ref().unwrap_or_else(|| &default).as_str() {
+        let mode = match s.mode.as_ref().unwrap_or(&default).as_str() {
             "REQUIRED" => BqMode::REQUIRED,
             "NULLABLE" => BqMode::NULLABLE,
             "REPEATED" => BqMode::REPEATED,
@@ -429,14 +428,14 @@ impl BqTableSchema {
                     .map(|f| BqTableSchema::from_table_field_schema(&f))
                     .collect()
             })
-            .unwrap_or(vec![]);
+            .unwrap_or_default();
 
         BqTableSchema {
             name: Some(name),
             type_,
             mode,
             fields: Box::new(schemas),
-            description: s.description.as_ref().map(|s| s.clone()),
+            description: s.description.clone(),
         }
     }
 }
@@ -502,6 +501,10 @@ impl BqRow {
     pub fn len(&self) -> usize {
         self.columns.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.columns.is_empty()
+    }
 }
 
 impl string::ToString for BqRow {
@@ -510,7 +513,7 @@ impl string::ToString for BqRow {
             .columns
             .iter()
             .map(|c| c.to_string())
-            .filter(|v| 0 < v.len())
+            .filter(|v| !v.is_empty())
             .collect::<Vec<_>>()
             .join(",");
         format!("{{{}}}", columns_str)
@@ -569,11 +572,7 @@ impl BqColumn {
                 BqType::INTEGER => BqValue::BqInteger(s.parse::<i64>().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(s.parse::<f64>().unwrap_or(0.0)),
                 BqType::BOOLEAN => BqValue::BqBool(s == "true"),
-                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_naive_utc_and_offset(
-                    NaiveDateTime::from_timestamp_opt(s.parse::<f64>().unwrap_or(0.0) as i64, 0)
-                        .unwrap(),
-                    Utc,
-                )),
+                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_timestamp(s.parse::<f64>().unwrap_or(0.0) as i64, 0).unwrap()),
                 BqType::DATETIME => BqValue::BqDateTime(
                     NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap(),
                 ),
@@ -589,10 +588,7 @@ impl BqColumn {
                 BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
                 BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => {
-                    BqValue::BqTimestamp(DateTime::from_naive_utc_and_offset(
-                        NaiveDateTime::from_timestamp_opt(n.as_i64().unwrap_or(0), 0).unwrap(),
-                        Utc,
-                    ))
+                    BqValue::BqTimestamp(DateTime::from_timestamp(n.as_i64().unwrap_or(0), 0).unwrap())
                 }
                 _ => BqValue::BqNull,
             },
@@ -635,7 +631,7 @@ impl BqColumn {
     }
 
     pub fn name(&self) -> Option<String> {
-        self.name.as_ref().map(|n| n.clone())
+        self.name.clone()
     }
 
     pub fn value(&self) -> &BqValue {
@@ -733,7 +729,7 @@ impl string::ToString for BqValue {
                     .columns
                     .iter()
                     .map(|r| r.to_string())
-                    .filter(|v| 0 < v.len())
+                    .filter(|v| !v.is_empty())
                     .collect::<Vec<_>>()
                     .join(",");
                 format!("{{{}}}", rs_str)
@@ -742,12 +738,12 @@ impl string::ToString for BqValue {
                 let rs_str = rs
                     .iter()
                     .map(|r| r.to_string())
-                    .filter(|v| 0 < v.len())
+                    .filter(|v| !v.is_empty())
                     .collect::<Vec<_>>()
                     .join(",");
                 format!("[{}]", rs_str)
             }
-            BqValue::BqNull => format!("null"),
+            BqValue::BqNull => "null".to_string(),
         }
     }
 }
@@ -943,7 +939,7 @@ impl Bq {
         if let Some(schema) = p.schema {
             req.schema = Some(schema);
         }
-        let api = self.api.tables().insert(req, &self.project, &dataset);
+        let api = self.api.tables().insert(req, &self.project, dataset);
         let res = api.doit().await;
         match Bq::handle_error(res) {
             Ok(result) => {
@@ -962,7 +958,7 @@ impl Bq {
     /// * `table` - target table name
     /// * `p` - request parameters
     pub async fn delete_table(&self, dataset: &DatasetId, table: &TableId) -> Result<()> {
-        let api = self.api.tables().delete(&self.project, &dataset, &table);
+        let api = self.api.tables().delete(&self.project, dataset, table);
         let res = api.doit().await;
         match Bq::handle_error(res) {
             Ok(result) => {
@@ -982,7 +978,7 @@ impl Bq {
         dataset: &'async_recursion DatasetId,
         p: &'async_recursion BqListParam,
     ) -> Result<Vec<BqTable>> {
-        let mut list_api = self.api.tables().list(&self.project, &dataset);
+        let mut list_api = self.api.tables().list(&self.project, dataset);
         if let Some(max_results) = p.max_results {
             list_api = list_api.max_results(max_results);
         }
@@ -1087,10 +1083,10 @@ impl Bq {
             .map(|fields| {
                 fields
                     .iter()
-                    .map(|f| BqTableSchema::from_table_field_schema(f))
+                    .map(BqTableSchema::from_table_field_schema)
                     .collect()
             })
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 
     fn to_rows(&self, schema: &TableSchema, rows: &Vec<TableRow>) -> Vec<BqRow> {
@@ -1100,7 +1096,7 @@ impl Bq {
             .map(|fields| {
                 let schemas: Vec<BqTableSchema> = fields
                     .iter()
-                    .map(|f| BqTableSchema::from_table_field_schema(f))
+                    .map(BqTableSchema::from_table_field_schema)
                     .collect();
                 rows.par_iter()
                     .map(|row| {
@@ -1116,7 +1112,7 @@ impl Bq {
                     })
                     .collect()
             })
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 
     #[async_recursion]
@@ -1133,9 +1129,8 @@ impl Bq {
                 let state = result
                     .1
                     .status
-                    .map(|st| st.state.map(|state| JobStatus::to_status(&*state)))
-                    .flatten()
-                    .unwrap_or_else(|| JobStatus::Unknown);
+                    .and_then(|st| st.state.map(|state| JobStatus::to_status(&state)))
+                    .unwrap_or(JobStatus::Unknown);
                 if state != JobStatus::Done {
                     let interval = 100 * retry_count.pow(2);
                     // eprintln!("{}, {}", e, interval);
@@ -1188,9 +1183,8 @@ impl Bq {
                     let state = result
                         .1
                         .status
-                        .map(|st| st.state.map(|state| JobStatus::to_status(&*state)))
-                        .flatten()
-                        .unwrap_or_else(|| JobStatus::Unknown);
+                        .and_then(|st| st.state.map(|state| JobStatus::to_status(&state)))
+                        .unwrap_or(JobStatus::Unknown);
                     let mut result = BqJobResult::default();
                     result.status = state;
                     Ok(result)
@@ -1200,20 +1194,19 @@ impl Bq {
                     let state = result
                         .1
                         .status
-                        .map(|st| {
+                        .and_then(|st| {
                             let (message, reason) = if let Some(error_result) = st.error_result {
                                 (error_result.message, error_result.reason)
                             } else {
                                 (None, None)
                             };
                             Some((st.state, message, reason))
-                        })
-                        .flatten();
+                        });
                     let status = state
                         .as_ref()
                         .map(|s| s.0.as_ref().map(|st| JobStatus::to_status(&*st.clone())))
                         .flatten()
-                        .unwrap_or_else(|| JobStatus::Unknown);
+                        .unwrap_or(JobStatus::Unknown);
                     let error_message = state.as_ref().map(|s| s.1.clone()).flatten();
                     let error_reason = state.map(|s| s.2).flatten();
                     let result = BqJobResult {
@@ -1446,7 +1439,7 @@ impl Bq {
                 .schema
                 .as_ref()
                 .map(|schema| self.to_rows(schema, rows))
-                .unwrap_or(vec![]);
+                .unwrap_or_default();
             if let Some(token) = &res.1.page_token {
                 let mut param = p.clone();
                 param.page_token(&token);

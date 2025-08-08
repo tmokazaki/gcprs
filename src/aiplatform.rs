@@ -24,9 +24,9 @@ pub struct AiPlatform {
 
 fn publisher_from_model_name(model_name: &str) -> String {
     match model_name {
-        model_name if model_name.starts_with("gemini") => return "google".to_string(),
-        model_name if model_name.starts_with("claude") => return "anthropic".to_string(),
-        _ => return "google".to_string(),
+        model_name if model_name.starts_with("gemini") => "google".to_string(),
+        model_name if model_name.starts_with("claude") => "anthropic".to_string(),
+        _ => "google".to_string(),
     }
 }
 

@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::all)]
     use super::super::*;
     use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
     use google_bigquery2::api::TableFieldSchema;

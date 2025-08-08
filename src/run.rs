@@ -132,11 +132,11 @@ impl Container {
                         (
                             env.name
                                 .as_ref()
-                                .unwrap_or_else(|| &default_str)
+                                .unwrap_or(&default_str)
                                 .to_string(),
                             env.value
                                 .as_ref()
-                                .unwrap_or_else(|| &default_str)
+                                .unwrap_or(&default_str)
                                 .to_string(),
                         )
                     })
