@@ -21,7 +21,7 @@ url = "^2"
 
 gcprs = { path = "../", features = ["full"] }
 datafusion = "*"
-thiserror = "1.0.38"
+thiserror = "2.0.12"
 object_store = { version = "^0.12", features = ["gcp"] }
 datafusion-common = "*"
 datafusion-expr = "*"
