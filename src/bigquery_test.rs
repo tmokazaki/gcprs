@@ -12,7 +12,7 @@ mod tests {
             id: "test-project-123".to_string(),
             numeric_id: "123456789".to_string(),
         };
-        
+
         assert_eq!(project.friendly_name, "Test Project");
         assert_eq!(project.id, "test-project-123");
         assert_eq!(project.numeric_id, "123456789");
@@ -29,18 +29,16 @@ mod tests {
     fn test_bq_list_param_builder() {
         let mut param = BqListParam::new();
         param.max_results(100).page_token("next_page_token");
-        
+
         assert_eq!(param.max_results, Some(100));
         assert_eq!(param.page_token, Some("next_page_token".to_string()));
     }
 
     #[test]
     fn test_bq_get_query_result_param_new() {
-        let param = BqGetQueryResultParam::new(
-            &"job-123".to_string(),
-            &"page-token-456".to_string(),
-        );
-        
+        let param =
+            BqGetQueryResultParam::new(&"job-123".to_string(), &"page-token-456".to_string());
+
         assert_eq!(param.job_id, "job-123");
         assert_eq!(param.page_token, "page-token-456");
         assert_eq!(param.max_results, 1000);
@@ -49,12 +47,9 @@ mod tests {
 
     #[test]
     fn test_bq_get_query_result_param_builder() {
-        let mut param = BqGetQueryResultParam::new(
-            &"job-123".to_string(),
-            &"token".to_string(),
-        );
+        let mut param = BqGetQueryResultParam::new(&"job-123".to_string(), &"token".to_string());
         param.max_results(500).num_result_limit(10000);
-        
+
         assert_eq!(param.max_results, 500);
         assert_eq!(param.num_result_limit, Some(10000));
     }
@@ -79,7 +74,7 @@ mod tests {
     fn test_bq_query_to_table_param_new() {
         let query = "SELECT * FROM table".to_string();
         let param = BqQueryToTableParam::new("project-id", "dataset-id", "table-id", &query);
-        
+
         assert_eq!(param.query, "SELECT * FROM table");
         assert_eq!(param.table_ref.project_id, Some("project-id".to_string()));
         assert_eq!(param.table_ref.dataset_id, Some("dataset-id".to_string()));
@@ -92,12 +87,12 @@ mod tests {
     fn test_bq_query_to_table_param_builder() {
         let query = "SELECT * FROM table".to_string();
         let mut param = BqQueryToTableParam::new("project", "dataset", "table", &query);
-        
+
         param
             .use_legacy_sql(true)
             .dry_run(true)
             .write_disposition(WriteDisposition::Append);
-        
+
         assert_eq!(param.use_legacy_sql, true);
         assert_eq!(param.dry_run, true);
         matches!(param.write_disposition, WriteDisposition::Append);
@@ -108,7 +103,7 @@ mod tests {
         let query = "SELECT * FROM table".to_string();
         let param = BqQueryToTableParam::new("project", "dataset", "table", &query);
         let config = param.to_query_config();
-        
+
         assert_eq!(config.query, Some("SELECT * FROM table".to_string()));
         assert!(config.destination_table.is_some());
         assert_eq!(config.priority, Some("INTERACTIVE".to_string()));
@@ -119,17 +114,17 @@ mod tests {
     #[test]
     fn test_bq_query_to_table_param_write_dispositions() {
         let query = "SELECT 1".to_string();
-        
+
         let mut param = BqQueryToTableParam::new("p", "d", "t", &query);
         param.write_disposition(WriteDisposition::Truncate);
         let config = param.to_query_config();
         assert_eq!(config.write_disposition, Some("WRITE_TRUNCATE".to_string()));
-        
+
         let mut param = BqQueryToTableParam::new("p", "d", "t", &query);
         param.write_disposition(WriteDisposition::Append);
         let config = param.to_query_config();
         assert_eq!(config.write_disposition, Some("WRITE_APPEND".to_string()));
-        
+
         let mut param = BqQueryToTableParam::new("p", "d", "t", &query);
         param.write_disposition(WriteDisposition::Empty);
         let config = param.to_query_config();
@@ -140,7 +135,7 @@ mod tests {
     fn test_bq_query_param_new() {
         let query = "SELECT * FROM dataset.table".to_string();
         let param = BqQueryParam::new(&query);
-        
+
         assert_eq!(param.query, "SELECT * FROM dataset.table");
         assert_eq!(param.use_legacy_sql, false);
         assert_eq!(param.max_results, 1000);
@@ -152,13 +147,13 @@ mod tests {
     fn test_bq_query_param_builder() {
         let query = "SELECT 1".to_string();
         let mut param = BqQueryParam::new(&query);
-        
+
         param
             .use_legacy_sql(true)
             .max_results(500)
             .num_result_limit(2000)
             .dry_run(true);
-        
+
         assert_eq!(param.use_legacy_sql, true);
         assert_eq!(param.max_results, 500);
         assert_eq!(param.num_result_limit, Some(2000));
@@ -170,7 +165,7 @@ mod tests {
         let query = "SELECT 1".to_string();
         let param = BqQueryParam::new(&query);
         let request: QueryRequest = param.into();
-        
+
         assert_eq!(request.query, Some("SELECT 1".to_string()));
         assert_eq!(request.max_results, Some(1000));
         assert_eq!(request.use_legacy_sql, Some(false));
@@ -182,7 +177,7 @@ mod tests {
         let query = "SELECT 1".to_string();
         let param = BqQueryParam::new(&query);
         let request: QueryRequest = (&param).into();
-        
+
         assert_eq!(request.query, Some("SELECT 1".to_string()));
         assert_eq!(request.max_results, Some(1000));
     }
@@ -197,7 +192,7 @@ mod tests {
     #[test]
     fn test_bq_insert_all_param_new() {
         let param = BqInsertAllParam::new("my-dataset", "my-table");
-        
+
         assert_eq!(param.dataset, "my-dataset");
         assert_eq!(param.table, "my-table");
         assert_eq!(param.skip_invalid_rows, false);
@@ -208,11 +203,9 @@ mod tests {
     #[test]
     fn test_bq_insert_all_param_builder() {
         let mut param = BqInsertAllParam::new("dataset", "table");
-        
-        param
-            .skip_invalid_rows(true)
-            .ignore_unknown_value(true);
-        
+
+        param.skip_invalid_rows(true).ignore_unknown_value(true);
+
         assert_eq!(param.skip_invalid_rows, true);
         assert_eq!(param.ignore_unknown_values, true);
     }
@@ -221,7 +214,7 @@ mod tests {
     fn test_bq_insert_all_param_set_trace_id() {
         let mut param = BqInsertAllParam::new("dataset", "table");
         let trace_id = param.set_trace_id();
-        
+
         assert!(trace_id.is_some());
         assert!(param.trace_id.is_some());
         // Verify it's a valid UUID format
@@ -231,7 +224,7 @@ mod tests {
     #[test]
     fn test_bq_table_new() {
         let table = BqTable::new("my-project", "my-dataset", "my-table");
-        
+
         assert_eq!(table.dataset.project, "my-project");
         assert_eq!(table.dataset.dataset, "my-dataset");
         assert_eq!(table.table_id, "my-table");
@@ -249,9 +242,9 @@ mod tests {
             fields: Box::new(vec![]),
             description: Some("Test field".to_string()),
         };
-        
+
         let field_schema = schema.to_table_field_schema();
-        
+
         assert_eq!(field_schema.name, Some("field_name".to_string()));
         assert_eq!(field_schema.type_, Some("STRING".to_string()));
         assert_eq!(field_schema.mode, Some("REQUIRED".to_string()));
@@ -272,7 +265,7 @@ mod tests {
             (BqType::RECORD, "RECORD"),
             (BqType::JSON, "JSON"),
         ];
-        
+
         for (bq_type, expected) in test_cases {
             let schema = BqTableSchema {
                 name: Some("test".to_string()),
@@ -293,7 +286,7 @@ mod tests {
             (BqMode::NULLABLE, "NULLABLE"),
             (BqMode::REPEATED, "REPEATED"),
         ];
-        
+
         for (bq_mode, expected) in test_cases {
             let schema = BqTableSchema {
                 name: Some("test".to_string()),
@@ -316,7 +309,7 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
+
         let schema = BqTableSchema {
             name: Some("parent".to_string()),
             type_: BqType::RECORD,
@@ -324,9 +317,9 @@ mod tests {
             fields: Box::new(vec![nested_field]),
             description: None,
         };
-        
+
         let field_schema = schema.to_table_field_schema();
-        
+
         assert!(field_schema.fields.is_some());
         let fields = field_schema.fields.unwrap();
         assert_eq!(fields.len(), 1);
@@ -340,9 +333,9 @@ mod tests {
         field_schema.type_ = Some("STRING".to_string());
         field_schema.mode = Some("REQUIRED".to_string());
         field_schema.description = Some("A test field".to_string());
-        
+
         let bq_schema = BqTableSchema::from_table_field_schema(&field_schema);
-        
+
         assert_eq!(bq_schema.name, Some("test_field".to_string()));
         assert_eq!(bq_schema.type_, BqType::STRING);
         assert_eq!(bq_schema.mode, BqMode::REQUIRED);
@@ -365,12 +358,12 @@ mod tests {
             ("JSON", BqType::JSON),
             ("UNKNOWN_TYPE", BqType::UNKNOWN),
         ];
-        
+
         for (type_str, expected_type) in test_cases {
             let mut field_schema = TableFieldSchema::default();
             field_schema.name = Some("test".to_string());
             field_schema.type_ = Some(type_str.to_string());
-            
+
             let bq_schema = BqTableSchema::from_table_field_schema(&field_schema);
             assert_eq!(bq_schema.type_, expected_type);
         }
@@ -388,9 +381,9 @@ mod tests {
                 value: BqValue::BqInteger(42),
             },
         ];
-        
+
         let row = BqRow::new(columns.clone());
-        
+
         assert_eq!(row.len(), 2);
         assert_eq!(row.columns().len(), 2);
     }
@@ -407,19 +400,19 @@ mod tests {
                 value: BqValue::BqInteger(30),
             },
         ];
-        
+
         let row = BqRow::new(columns);
-        
+
         match row.get("name") {
             Some(BqValue::BqString(s)) => assert_eq!(s, "John"),
             _ => panic!("Expected BqString"),
         }
-        
+
         match row.get("age") {
             Some(BqValue::BqInteger(i)) => assert_eq!(*i, 30),
             _ => panic!("Expected BqInteger"),
         }
-        
+
         assert!(row.get("nonexistent").is_none());
     }
 
@@ -435,10 +428,10 @@ mod tests {
                 value: BqValue::BqInteger(123),
             },
         ];
-        
+
         let row = BqRow::new(columns);
         let str = row.to_string();
-        
+
         assert!(str.contains("field1"));
         assert!(str.contains("test"));
         assert!(str.contains("field2"));
@@ -454,12 +447,9 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("test_string")),
-            &schema,
-        );
-        
+
+        let value = BqColumn::value_to_bq_value(Some(json!("test_string")), &schema);
+
         match value {
             BqValue::BqString(s) => assert_eq!(s, "test_string"),
             _ => panic!("Expected BqString"),
@@ -475,22 +465,16 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
+
         // From string
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("42")),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!("42")), &schema);
         match value {
             BqValue::BqInteger(i) => assert_eq!(i, 42),
             _ => panic!("Expected BqInteger"),
         }
-        
+
         // From number
-        let value = BqColumn::value_to_bq_value(
-            Some(json!(42)),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!(42)), &schema);
         match value {
             BqValue::BqInteger(i) => assert_eq!(i, 42),
             _ => panic!("Expected BqInteger"),
@@ -506,22 +490,16 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
+
         // From string
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("3.14")),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!("3.14")), &schema);
         match value {
             BqValue::BqFloat(f) => assert_eq!(f, 3.14),
             _ => panic!("Expected BqFloat"),
         }
-        
+
         // From number
-        let value = BqColumn::value_to_bq_value(
-            Some(json!(3.14)),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!(3.14)), &schema);
         match value {
             BqValue::BqFloat(f) => assert_eq!(f, 3.14),
             _ => panic!("Expected BqFloat"),
@@ -537,22 +515,16 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
+
         // From string
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("true")),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!("true")), &schema);
         match value {
             BqValue::BqBool(b) => assert_eq!(b, true),
             _ => panic!("Expected BqBool"),
         }
-        
+
         // From bool
-        let value = BqColumn::value_to_bq_value(
-            Some(json!(false)),
-            &schema,
-        );
+        let value = BqColumn::value_to_bq_value(Some(json!(false)), &schema);
         match value {
             BqValue::BqBool(b) => assert_eq!(b, false),
             _ => panic!("Expected BqBool"),
@@ -568,18 +540,15 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("2023-12-25")),
-            &schema,
-        );
-        
+
+        let value = BqColumn::value_to_bq_value(Some(json!("2023-12-25")), &schema);
+
         match value {
             BqValue::BqDate(d) => {
                 assert_eq!(d.year(), 2023);
                 assert_eq!(d.month(), 12);
                 assert_eq!(d.day(), 25);
-            },
+            }
             _ => panic!("Expected BqDate"),
         }
     }
@@ -593,18 +562,15 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("14:30:00")),
-            &schema,
-        );
-        
+
+        let value = BqColumn::value_to_bq_value(Some(json!("14:30:00")), &schema);
+
         match value {
             BqValue::BqTime(t) => {
                 assert_eq!(t.hour(), 14);
                 assert_eq!(t.minute(), 30);
                 assert_eq!(t.second(), 0);
-            },
+            }
             _ => panic!("Expected BqTime"),
         }
     }
@@ -618,12 +584,9 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
-        let value = BqColumn::value_to_bq_value(
-            Some(json!("2023-12-25T14:30:00.123456")),
-            &schema,
-        );
-        
+
+        let value = BqColumn::value_to_bq_value(Some(json!("2023-12-25T14:30:00.123456")), &schema);
+
         match value {
             BqValue::BqDateTime(dt) => {
                 assert_eq!(dt.year(), 2023);
@@ -632,7 +595,7 @@ mod tests {
                 assert_eq!(dt.hour(), 14);
                 assert_eq!(dt.minute(), 30);
                 assert_eq!(dt.second(), 0);
-            },
+            }
             _ => panic!("Expected BqDateTime"),
         }
     }
@@ -646,12 +609,9 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
-        let value = BqColumn::value_to_bq_value(
-            Some(json!(["item1", "item2", "item3"])),
-            &schema,
-        );
-        
+
+        let value = BqColumn::value_to_bq_value(Some(json!(["item1", "item2", "item3"])), &schema);
+
         match value {
             BqValue::BqRepeated(items) => {
                 assert_eq!(items.len(), 3);
@@ -659,7 +619,7 @@ mod tests {
                     BqValue::BqString(s) => assert_eq!(s, "item1"),
                     _ => panic!("Expected BqString in array"),
                 }
-            },
+            }
             _ => panic!("Expected BqRepeated"),
         }
     }
@@ -673,10 +633,10 @@ mod tests {
             fields: Box::new(vec![]),
             description: None,
         };
-        
+
         let value = BqColumn::value_to_bq_value(None, &schema);
         assert!(matches!(value, BqValue::BqNull));
-        
+
         let value = BqColumn::value_to_bq_value(Some(json!(null)), &schema);
         assert!(matches!(value, BqValue::BqNull));
     }
@@ -687,7 +647,7 @@ mod tests {
             name: Some("test_col".to_string()),
             value: BqValue::BqString("test_value".to_string()),
         };
-        
+
         assert_eq!(column.name(), Some("test_col".to_string()));
         match column.value() {
             BqValue::BqString(s) => assert_eq!(s, "test_value"),
@@ -704,14 +664,14 @@ mod tests {
         let str = column.to_string();
         assert!(str.contains("name"));
         assert!(str.contains("John"));
-        
+
         let column = BqColumn {
             name: None,
             value: BqValue::BqInteger(42),
         };
         let str = column.to_string();
         assert_eq!(str, "42");
-        
+
         let column = BqColumn {
             name: Some("null_field".to_string()),
             value: BqValue::BqNull,
@@ -722,24 +682,27 @@ mod tests {
 
     #[test]
     fn test_bq_value_to_string() {
-        assert_eq!(BqValue::BqString("test".to_string()).to_string(), r#""test""#);
+        assert_eq!(
+            BqValue::BqString("test".to_string()).to_string(),
+            r#""test""#
+        );
         assert_eq!(BqValue::BqInteger(42).to_string(), "42");
         assert_eq!(BqValue::BqFloat(3.14).to_string(), "3.14");
         assert_eq!(BqValue::BqBool(true).to_string(), "true");
         assert_eq!(BqValue::BqNull.to_string(), "null");
-        
+
         let date = NaiveDate::from_ymd_opt(2023, 12, 25).unwrap();
         assert_eq!(BqValue::BqDate(date).to_string(), r#""2023-12-25""#);
-        
+
         let time = NaiveTime::from_hms_opt(14, 30, 0).unwrap();
         assert_eq!(BqValue::BqTime(time).to_string(), r#""14:30:00""#);
-        
+
         let datetime = NaiveDateTime::new(date, time);
         assert_eq!(
             BqValue::BqDateTime(datetime).to_string(),
             r#""2023-12-25T14:30:00.000000""#
         );
-        
+
         let timestamp = Utc.timestamp_opt(1703505000, 0).unwrap();
         assert!(BqValue::BqTimestamp(timestamp).to_string().contains("2023"));
     }
@@ -770,7 +733,7 @@ mod tests {
         let row = BqRow::new(columns);
         let struct_val = BqValue::BqStruct(row);
         let str = struct_val.to_string();
-        
+
         assert!(str.contains("field1"));
         assert!(str.contains("value1"));
         assert!(str.contains("field2"));
@@ -794,10 +757,10 @@ mod tests {
             id: "test-id".to_string(),
             numeric_id: "123".to_string(),
         };
-        
+
         let json = serde_json::to_string(&project).unwrap();
         let deserialized: BqProject = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(project.friendly_name, deserialized.friendly_name);
         assert_eq!(project.id, deserialized.id);
         assert_eq!(project.numeric_id, deserialized.numeric_id);
@@ -806,10 +769,10 @@ mod tests {
     #[test]
     fn test_serialization_bq_dataset() {
         let dataset = BqDataset::new("project", "dataset");
-        
+
         let json = serde_json::to_string(&dataset).unwrap();
         let deserialized: BqDataset = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(dataset.project, deserialized.project);
         assert_eq!(dataset.dataset, deserialized.dataset);
     }
@@ -817,10 +780,10 @@ mod tests {
     #[test]
     fn test_serialization_bq_table() {
         let table = BqTable::new("project", "dataset", "table");
-        
+
         let json = serde_json::to_string(&table).unwrap();
         let deserialized: BqTable = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(table.table_id, deserialized.table_id);
         assert_eq!(table.dataset.project, deserialized.dataset.project);
         assert_eq!(table.dataset.dataset, deserialized.dataset.dataset);
@@ -830,10 +793,10 @@ mod tests {
     fn test_serialization_bq_insert_all_param() {
         let mut param = BqInsertAllParam::new("dataset", "table");
         param.skip_invalid_rows(true);
-        
+
         let json = serde_json::to_string(&param).unwrap();
         let deserialized: BqInsertAllParam = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(param.dataset, deserialized.dataset);
         assert_eq!(param.table, deserialized.table);
         assert_eq!(param.skip_invalid_rows, deserialized.skip_invalid_rows);
