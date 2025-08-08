@@ -616,3 +616,7 @@ impl Gcs {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "gcs_test.rs"]
+mod tests;

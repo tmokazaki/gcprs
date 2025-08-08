@@ -241,13 +241,22 @@ impl BqQueryParam {
         self
     }
 
-    fn to_query_request(&self) -> QueryRequest {
+}
+
+impl Into<QueryRequest> for BqQueryParam {
+    fn into(self) -> QueryRequest {
         let mut req = QueryRequest::default();
         req.query = Some(self.query.clone());
         req.max_results = Some(self.max_results);
         req.use_legacy_sql = Some(self.use_legacy_sql);
         req.dry_run = Some(self.dry_run);
         req
+    }
+}
+
+impl Into<QueryRequest> for &BqQueryParam {
+    fn into(self) -> QueryRequest {
+        self.to_owned().into()
     }
 }
 
@@ -458,7 +467,7 @@ pub enum BqType {
     UNKNOWN,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BqRow {
     /// To keep column order
     _name_index: HashMap<String, i32>,
@@ -508,7 +517,7 @@ impl string::ToString for BqRow {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct BqColumn {
     /// column name
     name: Option<String>,
@@ -635,7 +644,7 @@ impl BqColumn {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum BqValue {
     /// STRING
     BqString(String),
@@ -1233,7 +1242,7 @@ impl Bq {
         &'async_recursion self,
         p: &'async_recursion BqQueryParam,
     ) -> Result<QueryResult> {
-        let req = p.to_query_request();
+        let req: QueryRequest = p.into();
         let query_api = self.api.jobs().query(req, &self.project);
         let resp = Bq::handle_error(query_api.doit().await);
         match resp {
@@ -1451,3 +1460,7 @@ impl Bq {
         Ok(bq_rows)
     }
 }
+
+#[cfg(test)]
+#[path = "bigquery_test.rs"]
+mod tests;
