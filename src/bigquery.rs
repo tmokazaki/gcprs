@@ -393,7 +393,11 @@ impl BqTableSchema {
             .iter()
             .map(|f| f.to_table_field_schema())
             .collect();
-        schema.fields = if !fields.is_empty() { Some(fields) } else { None };
+        schema.fields = if !fields.is_empty() {
+            Some(fields)
+        } else {
+            None
+        };
         schema
     }
 
@@ -572,7 +576,9 @@ impl BqColumn {
                 BqType::INTEGER => BqValue::BqInteger(s.parse::<i64>().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(s.parse::<f64>().unwrap_or(0.0)),
                 BqType::BOOLEAN => BqValue::BqBool(s == "true"),
-                BqType::TIMESTAMP => BqValue::BqTimestamp(DateTime::from_timestamp(s.parse::<f64>().unwrap_or(0.0) as i64, 0).unwrap()),
+                BqType::TIMESTAMP => BqValue::BqTimestamp(
+                    DateTime::from_timestamp(s.parse::<f64>().unwrap_or(0.0) as i64, 0).unwrap(),
+                ),
                 BqType::DATETIME => BqValue::BqDateTime(
                     NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S%.6f").unwrap(),
                 ),
@@ -587,9 +593,9 @@ impl BqColumn {
                 BqType::STRING => BqValue::BqString(n.to_string()),
                 BqType::INTEGER => BqValue::BqInteger(n.as_i64().unwrap_or(0)),
                 BqType::FLOAT => BqValue::BqFloat(n.as_f64().unwrap_or(0.0)),
-                BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => {
-                    BqValue::BqTimestamp(DateTime::from_timestamp(n.as_i64().unwrap_or(0), 0).unwrap())
-                }
+                BqType::TIMESTAMP | BqType::DATE | BqType::DATETIME => BqValue::BqTimestamp(
+                    DateTime::from_timestamp(n.as_i64().unwrap_or(0), 0).unwrap(),
+                ),
                 _ => BqValue::BqNull,
             },
             Value::Bool(b) => match schema.type_ {
@@ -1191,20 +1197,17 @@ impl Bq {
                 } else {
                     let self_link = result.1.self_link;
                     let job_id = result.1.job_reference.map(|jr| jr.job_id).flatten();
-                    let state = result
-                        .1
-                        .status
-                        .and_then(|st| {
-                            let (message, reason) = if let Some(error_result) = st.error_result {
-                                (error_result.message, error_result.reason)
-                            } else {
-                                (None, None)
-                            };
-                            Some((st.state, message, reason))
-                        });
+                    let state = result.1.status.and_then(|st| {
+                        let (message, reason) = if let Some(error_result) = st.error_result {
+                            (error_result.message, error_result.reason)
+                        } else {
+                            (None, None)
+                        };
+                        Some((st.state, message, reason))
+                    });
                     let status = state
                         .as_ref()
-                        .map(|s| s.0.as_ref().map(|st| JobStatus::to_status(&*st.clone())))
+                        .map(|s| s.0.as_ref().map(|st| JobStatus::to_status(&st.clone())))
                         .flatten()
                         .unwrap_or(JobStatus::Unknown);
                     let error_message = state.as_ref().map(|s| s.1.clone()).flatten();

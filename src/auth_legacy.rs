@@ -116,25 +116,17 @@ impl GcpAuth {
 const GOOGLE_OAUTH2_CERTS_URL: &str = "https://www.googleapis.com/oauth2/v1/certs";
 
 fn get_iat(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
-    claim
-        .get("iat")
-        .and_then(|iat| match iat {
-            serde_json::Value::Number(n) => {
-                Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap())
-            }
-            _ => None,
-        })
+    claim.get("iat").and_then(|iat| match iat {
+        serde_json::Value::Number(n) => Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap()),
+        _ => None,
+    })
 }
 
 fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
-    claim
-        .get("exp")
-        .and_then(|iat| match iat {
-            serde_json::Value::Number(n) => {
-                Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap())
-            }
-            _ => None,
-        })
+    claim.get("exp").and_then(|iat| match iat {
+        serde_json::Value::Number(n) => Some(Utc.timestamp_opt(n.as_i64().unwrap(), 0).unwrap()),
+        _ => None,
+    })
 }
 
 /// Verify google jwt identity token
