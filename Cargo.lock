@@ -795,9 +795,9 @@ dependencies = [
  "gcprs",
  "json_to_table",
  "lindera",
- "linfa 0.7.1",
+ "linfa 0.7.1 (git+https://github.com/rust-ml/linfa.git)",
  "linfa-clustering",
- "linfa-nn 0.6.1",
+ "linfa-nn 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ndarray",
  "object_store",
  "plotly",
@@ -2995,15 +2995,6 @@ dependencies = [
 
 [[package]]
 name = "kdtree"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80ee359328fc9087e9e3fc0a4567c4dd27ec69a127d6a70e8d9dd22845b8b1a2"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "kdtree"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f0a0e9f770b65bac9aad00f97a67ab5c5319effed07f6da385da3c2115e47ba"
@@ -3329,14 +3320,15 @@ dependencies = [
 
 [[package]]
 name = "linfa"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d65d0d9f86f65485b3a9fc6dad8620b67394d102aa3c4088628a9a1accda008"
+checksum = "56f9097edc7c89d03d526efbacf6d90914e3a8fa53bd56c2d1489e3a90819370"
 dependencies = [
  "approx",
  "ndarray",
  "num-traits",
  "rand 0.8.5",
+ "sprs",
  "thiserror 1.0.69",
 ]
 
@@ -3360,9 +3352,9 @@ name = "linfa-clustering"
 version = "0.7.1"
 source = "git+https://github.com/rust-ml/linfa.git#77457b22d0b3d477c14d7f74793693f68738fe76"
 dependencies = [
- "linfa 0.7.1",
+ "linfa 0.7.1 (git+https://github.com/rust-ml/linfa.git)",
  "linfa-linalg",
- "linfa-nn 0.7.2",
+ "linfa-nn 0.7.2 (git+https://github.com/rust-ml/linfa.git)",
  "ndarray",
  "ndarray-linalg",
  "ndarray-rand",
@@ -3388,12 +3380,12 @@ dependencies = [
 
 [[package]]
 name = "linfa-nn"
-version = "0.6.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5183e7d3b291e28fd23c965c95207471cbc71399fd83b942096df463cabdd43"
+checksum = "b31aeb1beadf239210aa6bc142d95aba626b729da707e2a38e7e953ad2775653"
 dependencies = [
- "kdtree 0.6.0",
- "linfa 0.6.1",
+ "kdtree",
+ "linfa 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ndarray",
  "ndarray-stats",
  "noisy_float",
@@ -3408,8 +3400,8 @@ name = "linfa-nn"
 version = "0.7.2"
 source = "git+https://github.com/rust-ml/linfa.git#77457b22d0b3d477c14d7f74793693f68738fe76"
 dependencies = [
- "kdtree 0.7.0",
- "linfa 0.7.1",
+ "kdtree",
+ "linfa 0.7.1 (git+https://github.com/rust-ml/linfa.git)",
  "ndarray",
  "ndarray-stats",
  "noisy_float",
