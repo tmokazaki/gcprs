@@ -2,10 +2,7 @@ use crate::auth::{hyper_util, oauth2};
 use anyhow::Result;
 use http_body_util::{BodyExt, Empty};
 use hyper_util::client::legacy::Client;
-use oauth2::hyper::{
-    body::{Buf, Bytes},
-    Method, Request,
-};
+use oauth2::hyper::{body::Bytes, Method, Request};
 use oauth2::hyper_rustls;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
@@ -16,9 +13,9 @@ use std::str;
 #[cfg(test)]
 use mockall::automock;
 
-static METADATA_ROOT: &'static str = "http://metadata.google.internal/computeMetadata/v1/";
+static METADATA_ROOT: &str = "http://metadata.google.internal/computeMetadata/v1/";
 
-static REQUEST_TYPE_ACCESS_TOKEN: &'static str = "auth-request-type/at";
+static REQUEST_TYPE_ACCESS_TOKEN: &str = "auth-request-type/at";
 
 // Auth request type
 #[derive(Clone)]

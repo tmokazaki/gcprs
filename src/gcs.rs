@@ -150,7 +150,6 @@ impl GcsObject {
             updated_at,
         }
     }
-
 }
 
 impl Into<Object> for GcsObject {

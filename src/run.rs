@@ -130,14 +130,8 @@ impl Container {
                 envs.iter()
                     .map(|env| {
                         (
-                            env.name
-                                .as_ref()
-                                .unwrap_or_else(|| &default_str)
-                                .to_string(),
-                            env.value
-                                .as_ref()
-                                .unwrap_or_else(|| &default_str)
-                                .to_string(),
+                            env.name.as_ref().unwrap_or(&default_str).to_string(),
+                            env.value.as_ref().unwrap_or(&default_str).to_string(),
                         )
                     })
                     .collect::<HashMap<String, String>>(),
