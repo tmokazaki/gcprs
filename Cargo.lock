@@ -777,7 +777,7 @@ dependencies = [
  "plotly",
  "serde",
  "serde_json",
- "tabled 0.12.2",
+ "tabled",
  "thiserror 2.0.12",
  "tokio",
  "url 2.5.4",
@@ -806,7 +806,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a65ebfec4fb190b6f90e944a817d60499ee0744e582530e2c9900a22e591d9a"
 dependencies = [
  "unicode-segmentation",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2946,7 +2946,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac716ca5dbe0028e41673f0748bc25a048e010960dd6094b3829ef994db73a31"
 dependencies = [
  "serde_json",
- "tabled 0.20.0",
+ "tabled",
 ]
 
 [[package]]
@@ -3862,24 +3862,13 @@ dependencies = [
 
 [[package]]
 name = "papergrid"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae7891b22598926e4398790c8fe6447930c72a67d36d983a49d6ce682ce83290"
-dependencies = [
- "bytecount",
- "fnv",
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "papergrid"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6978128c8b51d8f4080631ceb2302ab51e32cc6e8615f735ee2f83fd269ae3f1"
 dependencies = [
  "bytecount",
  "fnv",
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -5231,21 +5220,11 @@ dependencies = [
 
 [[package]]
 name = "tabled"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce69a5028cd9576063ec1f48edb2c75339fd835e6094ef3e05b3a079bf594a6"
-dependencies = [
- "papergrid 0.9.1",
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "tabled"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e39a2ee1fbcd360805a771e1b300f78cc88fec7b8d3e2f71cd37bbf23e725c7d"
 dependencies = [
- "papergrid 0.17.0",
+ "papergrid",
  "testing_table",
 ]
 
@@ -5294,7 +5273,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f8daae29995a24f65619e19d8d31dea5b389f3d853d8bf297bbf607cd0014cc"
 dependencies = [
- "unicode-width 0.2.1",
+ "unicode-width",
 ]
 
 [[package]]
@@ -5645,12 +5624,6 @@ name = "unicode-segmentation"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
-
-[[package]]
-name = "unicode-width"
-version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "unicode-width"
