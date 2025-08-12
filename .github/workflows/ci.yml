@@ -37,6 +37,9 @@ jobs:
       - name: Check code compiles
         run: cargo check --all-features
 
+      - name: Check code(cli) compiles
+        run: cargo check -p cli --all-features
+
       - name: Run tests
         run: |
           cargo test --lib

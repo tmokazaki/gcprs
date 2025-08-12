@@ -48,12 +48,9 @@ pub fn render<T: TableView + Serialize>(
         }
         _ => {
             let mut builder = Builder::default();
-            let header = if 0 < data.len() {
-                data[0].columns()
-            } else {
-                vec![]
+            if !data.is_empty() {
+                builder.push_record(data[0].columns());
             };
-            builder.set_header(header);
             for pj in data {
                 builder.push_record(pj.values());
             }
