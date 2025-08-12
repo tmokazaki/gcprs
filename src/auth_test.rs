@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::all)]
     use super::super::*;
     use chrono::{TimeZone, Utc};
     use serde_json::json;
@@ -39,7 +40,7 @@ mod tests {
 
         let iat = get_iat(&claim);
         assert!(iat.is_some());
-        
+
         let expected = Utc.timestamp_opt(timestamp, 0).unwrap();
         assert_eq!(iat.unwrap(), expected);
     }
@@ -78,7 +79,7 @@ mod tests {
 
         let exp = get_exp(&claim);
         assert!(exp.is_some());
-        
+
         let expected = Utc.timestamp_opt(timestamp, 0).unwrap();
         assert_eq!(exp.unwrap(), expected);
     }
@@ -115,7 +116,7 @@ mod tests {
 
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         // Float values in JSON won't convert to i64, so they should return None
         assert!(iat.is_none());
         assert!(exp.is_none());
@@ -123,7 +124,10 @@ mod tests {
 
     #[test]
     fn test_google_oauth2_certs_url_constant() {
-        assert_eq!(GOOGLE_OAUTH2_CERTS_URL, "https://www.googleapis.com/oauth2/v1/certs");
+        assert_eq!(
+            GOOGLE_OAUTH2_CERTS_URL,
+            "https://www.googleapis.com/oauth2/v1/certs"
+        );
     }
 
     #[test]
@@ -212,7 +216,7 @@ mod tests {
 
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_none());
         assert!(exp.is_none());
     }
@@ -230,7 +234,7 @@ mod tests {
         // Should not find iat/exp in nested objects
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_none());
         assert!(exp.is_none());
     }
@@ -245,7 +249,7 @@ mod tests {
         // String representations of numbers should not be parsed
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_none());
         assert!(exp.is_none());
     }
@@ -259,7 +263,7 @@ mod tests {
 
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_none());
         assert!(exp.is_none());
     }
@@ -280,7 +284,7 @@ mod tests {
 
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_some());
         assert!(exp.is_some());
         assert_eq!(iat.unwrap(), Utc.timestamp_opt(now, 0).unwrap());
@@ -296,14 +300,14 @@ mod tests {
 
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         assert!(iat.is_some());
         assert!(exp.is_some());
         assert_eq!(iat.unwrap(), Utc.timestamp_opt(0, 0).unwrap());
         assert_eq!(exp.unwrap(), Utc.timestamp_opt(0, 0).unwrap());
     }
 
-    // Note: Async tests for browser_user_url are commented out as they require 
+    // Note: Async tests for browser_user_url are commented out as they require
     // interactive environment and can hang in CI
     // #[tokio::test]
     // async fn test_browser_user_url_with_code_needed() {
@@ -333,12 +337,12 @@ mod tests {
     // async fn test_installed_flow_browser_delegate_present_user_url() {
     //     let delegate = InstalledFlowBrowserDelegate;
     //     let url = "https://example.com/auth";
-    //     
+    //
     //     // Test with need_code = true
     //     let future = delegate.present_user_url(url, true);
     //     let result = future.await;
     //     assert!(result.is_err());
-    //     
+    //
     //     // Test with need_code = false
     //     let future = delegate.present_user_url(url, false);
     //     let result = future.await;
@@ -357,7 +361,7 @@ mod tests {
         // These should work without panic
         let iat = get_iat(&claim);
         let exp = get_exp(&claim);
-        
+
         // Both should succeed with valid timestamps
         assert!(iat.is_some());
         assert!(exp.is_some());
@@ -368,7 +372,7 @@ mod tests {
         // Verify InstalledFlowBrowserDelegate implements Copy
         fn assert_copy<T: Copy>() {}
         assert_copy::<InstalledFlowBrowserDelegate>();
-        
+
         let delegate1 = InstalledFlowBrowserDelegate;
         let _delegate2 = delegate1; // Copy
         let _delegate3 = delegate1; // Can still use delegate1 because it's Copy

@@ -146,18 +146,18 @@ const GOOGLE_OAUTH2_CERTS_URL: &str = "https://www.googleapis.com/oauth2/v1/cert
 
 fn get_iat(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     claim.get("iat").and_then(|iat| match iat {
-        serde_json::Value::Number(n) => {
-            n.as_i64().and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single())
-        }
+        serde_json::Value::Number(n) => n
+            .as_i64()
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single()),
         _ => None,
     })
 }
 
 fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
     claim.get("exp").and_then(|exp| match exp {
-        serde_json::Value::Number(n) => {
-            n.as_i64().and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single())
-        }
+        serde_json::Value::Number(n) => n
+            .as_i64()
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single()),
         _ => None,
     })
 }

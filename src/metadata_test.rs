@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::all)]
     use super::super::*;
 
     #[test]
@@ -7,17 +8,35 @@ mod tests {
         assert_eq!(RequestType::AccessToken.to_string(), "auth-request-type/at");
         assert_eq!(RequestType::IdToken.to_string(), "auth-request-type/it");
         assert_eq!(RequestType::MdsPing.to_string(), "auth-request-type/mds");
-        assert_eq!(RequestType::ReauthStart.to_string(), "auth-request-type/re-start");
-        assert_eq!(RequestType::ReauthContinue.to_string(), "auth-request-type/re-cont");
+        assert_eq!(
+            RequestType::ReauthStart.to_string(),
+            "auth-request-type/re-start"
+        );
+        assert_eq!(
+            RequestType::ReauthContinue.to_string(),
+            "auth-request-type/re-cont"
+        );
     }
 
     #[test]
     fn test_credential_type_display() {
         assert_eq!(CredentialType::User.to_string(), "cred-type/u");
-        assert_eq!(CredentialType::ServiceAccountAssertion.to_string(), "cred-type/sa");
-        assert_eq!(CredentialType::ServiceAccountJwt.to_string(), "cred-type/jwt");
-        assert_eq!(CredentialType::ServiceAccountMds.to_string(), "cred-type/mds");
-        assert_eq!(CredentialType::ServiceAccountImpersonate.to_string(), "cred-type/imp");
+        assert_eq!(
+            CredentialType::ServiceAccountAssertion.to_string(),
+            "cred-type/sa"
+        );
+        assert_eq!(
+            CredentialType::ServiceAccountJwt.to_string(),
+            "cred-type/jwt"
+        );
+        assert_eq!(
+            CredentialType::ServiceAccountMds.to_string(),
+            "cred-type/mds"
+        );
+        assert_eq!(
+            CredentialType::ServiceAccountImpersonate.to_string(),
+            "cred-type/imp"
+        );
     }
 
     #[test]
@@ -25,7 +44,7 @@ mod tests {
         let rt = RequestType::AccessToken;
         let cloned = rt.clone();
         assert_eq!(rt.to_string(), cloned.to_string());
-        
+
         let rt = RequestType::IdToken;
         let cloned = rt.clone();
         assert_eq!(rt.to_string(), cloned.to_string());
@@ -36,7 +55,7 @@ mod tests {
         let ct = CredentialType::User;
         let cloned = ct.clone();
         assert_eq!(ct.to_string(), cloned.to_string());
-        
+
         let ct = CredentialType::ServiceAccountMds;
         let cloned = ct.clone();
         assert_eq!(ct.to_string(), cloned.to_string());
@@ -91,7 +110,10 @@ mod tests {
         assert_eq!(info.aliases.len(), 2);
         assert_eq!(info.aliases[0], "default");
         assert_eq!(info.aliases[1], "123456789");
-        assert_eq!(info.email, "service-account@project.iam.gserviceaccount.com");
+        assert_eq!(
+            info.email,
+            "service-account@project.iam.gserviceaccount.com"
+        );
         assert_eq!(info.scopes.len(), 2);
     }
 
@@ -112,7 +134,10 @@ mod tests {
 
     #[test]
     fn test_metadata_root_constant() {
-        assert_eq!(METADATA_ROOT, "http://metadata.google.internal/computeMetadata/v1/");
+        assert_eq!(
+            METADATA_ROOT,
+            "http://metadata.google.internal/computeMetadata/v1/"
+        );
     }
 
     #[test]
@@ -191,7 +216,11 @@ mod tests {
     #[test]
     fn test_service_account_info_json_roundtrip() {
         let original = ServiceAccountInfo {
-            aliases: vec!["alias1".to_string(), "alias2".to_string(), "alias3".to_string()],
+            aliases: vec![
+                "alias1".to_string(),
+                "alias2".to_string(),
+                "alias3".to_string(),
+            ],
             email: "complex-email@subdomain.example.com".to_string(),
             scopes: vec![
                 "https://www.googleapis.com/auth/cloud-platform".to_string(),
@@ -238,7 +267,7 @@ mod tests {
             email: "test@example.com".to_string(),
             scopes: vec!["scope".to_string()],
         };
-        
+
         let cloned = info.clone();
         assert_eq!(info.email, cloned.email);
         assert_eq!(info.aliases, cloned.aliases);
