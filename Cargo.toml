@@ -52,7 +52,7 @@ google-run2 = { version = "*", optional = true }
 google-secretmanager1 = { version = "*", optional = true }
 google-iamcredentials1 = { version = "*" }
 google-aiplatform1_beta1 = { version = "*", optional = true }
-uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.18.0", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mime = { version = "0.3.16", optional = true }
 jsonwebtoken = { version = "9.3.1", features = ["use_pem"] }
 mime_guess = { version = "2.0.4", optional = true }
