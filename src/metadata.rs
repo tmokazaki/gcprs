@@ -10,9 +10,6 @@ use std::fmt;
 use std::process::Command;
 use std::str;
 
-#[cfg(test)]
-use mockall::automock;
-
 static METADATA_ROOT: &str = "http://metadata.google.internal/computeMetadata/v1/";
 
 static REQUEST_TYPE_ACCESS_TOKEN: &str = "auth-request-type/at";
@@ -60,7 +57,7 @@ impl fmt::Display for CredentialType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MetadataApi {}
 
 pub type HttpsConnector =
@@ -78,14 +75,13 @@ pub fn new_client(
     )
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ServiceAccountInfo {
     pub aliases: Vec<String>,
     pub email: String,
     pub scopes: Vec<String>,
 }
 
-#[cfg_attr(test, automock)]
 impl MetadataApi {
     pub fn new() -> Self {
         MetadataApi {}
@@ -155,3 +151,7 @@ impl MetadataApi {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "metadata_test.rs"]
+mod tests;
