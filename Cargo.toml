@@ -37,7 +37,7 @@ http-body-util = "^0.1"
 hyper-legacy = { version = "^0.14", package = "hyper" }
 hyper-rustls-legacy = { version = "^0.25", package = "hyper-rustls" }
 yup-oauth2-legacy = { version = "^9", package = "yup-oauth2", features = ["hyper-rustls"] }
-rayon = "^1.5"
+rayon = "^1.11"
 urlencoding = "^2"
 webbrowser = ">0.8.3"
 regex = { version = "1.5", optional = true }
