@@ -20,11 +20,11 @@ json_to_table = "0.12"
 url = "^2"
 
 gcprs = { path = "../", features = ["full"] }
-datafusion = "*"
+datafusion = "50.1.0"
 thiserror = "2.0.16"
 object_store = { version = "^0.12", features = ["gcp"] }
-datafusion-common = "*"
-datafusion-expr = "*"
+datafusion-common = "50.1.0"
+datafusion-expr = "50.1.0"
 linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["serde", "ndarray-linalg"] }
 linfa-clustering = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["ndarray-linalg", "serde"] }
 ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
