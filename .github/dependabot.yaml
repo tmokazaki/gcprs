@@ -6,6 +6,10 @@ updates:
     interval: "daily"
     time: "10:00"
     timezone: "Asia/Tokyo"
+  groups:
+    datafusion:
+      patterns:
+        - "datafusion*"
   ignore:
       # These are peer deps of Cargo and should not be automatically bumped
       - dependency-name: "semver"
