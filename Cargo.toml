@@ -40,7 +40,7 @@ yup-oauth2-legacy = { version = "^9", package = "yup-oauth2", features = ["hyper
 rayon = "^1.11"
 urlencoding = "^2"
 webbrowser = ">0.8.3"
-regex = { version = "1.11", optional = true }
+regex = { version = "1.12", optional = true }
 tokio = { version = "^1.0", features = ["full"] }
 
 google-storage1 = { version = "*", optional = true }
