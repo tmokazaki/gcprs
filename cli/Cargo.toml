@@ -20,7 +20,7 @@ json_to_table = "0.12"
 url = "^2"
 
 gcprs = { path = "../", features = ["full"] }
-datafusion = "50.1.0"
+datafusion = "50.2.0"
 thiserror = "2.0.16"
 object_store = { version = "^0.12", features = ["gcp"] }
 datafusion-common = "50.1.0"
