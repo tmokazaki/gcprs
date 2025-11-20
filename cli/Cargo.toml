@@ -27,7 +27,7 @@ datafusion-common = "51.0.0"
 datafusion-expr = "51.0.0"
 linfa = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["serde", "ndarray-linalg"] }
 linfa-clustering = { git = "https://github.com/rust-ml/linfa.git", version = "0.7.0", features = ["ndarray-linalg", "serde"] }
-ndarray = { version = "0.15.6", features = ["rayon", "serde"] }
+ndarray = { version = "0.16.1", features = ["rayon", "serde"] }
 linfa-nn = { version = "0.7.2", features = ["serde"] }
 plotly = { version = "0.12.1", features = ["kaleido", "ndarray"] }
 lindera = { version = "0.23.0", features = ["ipadic"], optional=true }

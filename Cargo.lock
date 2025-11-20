@@ -766,7 +766,7 @@ dependencies = [
  "linfa 0.7.1 (git+https://github.com/rust-ml/linfa.git)",
  "linfa-clustering",
  "linfa-nn 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "ndarray 0.15.6",
+ "ndarray 0.16.1",
  "object_store",
  "plotly",
  "serde",
@@ -3605,6 +3605,8 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "rawpointer",
+ "rayon",
+ "serde",
 ]
 
 [[package]]
