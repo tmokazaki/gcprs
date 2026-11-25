@@ -26,7 +26,18 @@ pub struct GcpAuth {
     auth: Authenticator<HttpsConnector>,
 }
 
+/// Install `ring` as the process-wide rustls crypto provider.
+///
+/// rustls cannot pick a provider automatically when both `ring` and `aws-lc-rs` are enabled in
+/// the dependency graph (e.g. when this crate is used together with `object_store`), and panics
+/// on the first TLS connection. Calling this before building any TLS client avoids that.
+/// It is a no-op if a provider has already been installed.
+pub fn install_crypto_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 pub fn new_client() -> Client<HttpsConnector, Body> {
+    install_crypto_provider();
     Client::builder(hyper_util::rt::TokioExecutor::new()).build(
         hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
@@ -77,6 +88,7 @@ impl GcpAuth {
     /// If there is `GOOGLE_APPLICATION_CREDENTIALS` in environment variables, use it first. Unless
     /// try to get credential from metadata server on GCP.
     pub async fn from_service_account() -> Result<Self> {
+        install_crypto_provider();
         let opts = ApplicationDefaultCredentialsFlowOpts::default();
         let authenticator = match ApplicationDefaultCredentialsAuthenticator::builder(opts).await {
             ApplicationDefaultCredentialsTypes::InstanceMetadata(auth) => auth
@@ -98,6 +110,7 @@ impl GcpAuth {
     ///
     /// You have to set the secret JSON path to `GOOGLE_APPLICATION_SECRET` environment variable.
     pub async fn from_user_auth() -> Result<Self> {
+        install_crypto_provider();
         let application_secret_path = env::var("GOOGLE_APPLICATION_SECRET")?;
         let secret: oauth2::ApplicationSecret =
             oauth2::read_application_secret(application_secret_path)
@@ -165,6 +178,7 @@ fn get_exp(claim: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
 /// Verify google jwt identity token
 ///
 pub async fn verify_token(token: &String) -> Result<()> {
+    install_crypto_provider();
     let _https = hyper_rustls::HttpsConnectorBuilder::new()
         .with_native_roots()
         .unwrap()

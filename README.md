@@ -383,7 +383,6 @@ gcprs/
 ├── src/
 │   ├── lib.rs               # Library entry point
 │   ├── auth.rs              # Modern authentication (OAuth2, Service Account)
-│   ├── auth_legacy.rs       # Legacy authentication support
 │   ├── metadata.rs          # GCP metadata server client
 │   ├── common/              # Common utilities
 │   │   └── error.rs         # Error types and handling

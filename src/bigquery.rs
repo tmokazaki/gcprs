@@ -1,4 +1,4 @@
-use crate::auth_legacy as auth;
+use crate::auth;
 use bigquery::api::{
     Job, JobConfiguration, JobConfigurationQuery, JsonObject, JsonValue, QueryRequest, Table,
     TableCell, TableDataInsertAllRequest, TableDataInsertAllRequestRows, TableFieldSchema,
@@ -299,6 +299,7 @@ impl BqCreateTableParam {
                     .map(|s| s.to_table_field_schema())
                     .collect(),
             ),
+            ..Default::default()
         });
         self
     }

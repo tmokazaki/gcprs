@@ -1,5 +1,4 @@
 pub mod auth;
-pub mod auth_legacy;
 pub mod metadata;
 
 #[cfg(feature = "aiplatform")]

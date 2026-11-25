@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::{Args, Subcommand};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::{
-    CsvReadOptions, DataFrame, NdJsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
+    CsvReadOptions, DataFrame, JsonReadOptions, ParquetReadOptions, SessionConfig, SessionContext,
 };
 use datafusion_common::config::{CsvOptions, JsonOptions, TableParquetOptions};
 use func::{udaf_string_agg, udf_pow};
@@ -132,7 +132,7 @@ pub async fn register_source(ctx: &SessionContext, inputs: Vec<String>) -> Resul
         if let Some(input_ex) = path.extension().and_then(OsStr::to_str) {
             match input_ex {
                 "json" | "njson" => {
-                    let mut options = NdJsonReadOptions::default();
+                    let mut options = JsonReadOptions::default();
                     options.file_extension = input_ex;
                     ctx.register_json(&table_id, input, options).await?
                 }

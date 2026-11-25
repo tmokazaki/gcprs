@@ -104,7 +104,7 @@ async fn run_kmeans(
     base_dataset.make_dataset(&ctx).await?;
 
     let dataset_arr = Array::from_vec(base_dataset.base_dataset())
-        .into_shape((base_dataset.total_rows(), base_dataset.fields().len()))?;
+        .into_shape_with_order((base_dataset.total_rows(), base_dataset.fields().len()))?;
     let dataset = DatasetBase::from(dataset_arr.clone());
 
     let model = if let Some(model_file) = args.load_model_file {
@@ -161,7 +161,7 @@ async fn run_dbscan(
     base_dataset.make_dataset(&ctx).await?;
 
     let dataset_arr = Array::from_iter(base_dataset.base_dataset())
-        .into_shape((base_dataset.total_rows(), base_dataset.fields().len()))?;
+        .into_shape_with_order((base_dataset.total_rows(), base_dataset.fields().len()))?;
     let dataset = DatasetBase::from(dataset_arr.clone());
 
     let clusters = Dbscan::params(args.min_point)
