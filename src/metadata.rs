@@ -65,6 +65,7 @@ pub type HttpsConnector =
 
 pub fn new_client(
 ) -> Client<HttpsConnector, http_body_util::combinators::BoxBody<Bytes, Infallible>> {
+    crate::auth::install_crypto_provider();
     Client::builder(hyper_util::rt::TokioExecutor::new()).build(
         hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()

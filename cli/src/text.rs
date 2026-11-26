@@ -1,13 +1,9 @@
 use crate::common::{render, OutputFormat, TableView};
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use lindera::{
-    dictionary::DictionaryConfig,
-    mode::Mode,
-    tokenizer::{Tokenizer, TokenizerConfig},
-    DictionaryKind,
-};
+use lindera::{dictionary::load_dictionary, mode::Mode, segmenter::Segmenter};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Debug, Args)]
 pub struct TextArgs {
@@ -52,33 +48,26 @@ impl TableView for Token {
     }
 }
 
+/// Tokenize Japanese text with the embedded IPADIC dictionary.
+pub fn tokenize(text: &str) -> Result<Vec<Token>> {
+    let dictionary = load_dictionary("embedded://ipadic")?;
+    let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
+
+    let mut tokens = segmenter.segment(Cow::Borrowed(text))?;
+    Ok(tokens
+        .iter_mut()
+        .map(|token| {
+            let text = token.surface.to_string();
+            let details = token.details().iter().map(|d| d.to_string()).collect();
+            Token { text, details }
+        })
+        .collect())
+}
+
 pub async fn handle(targs: TextArgs) -> Result<()> {
-    let dictionary = DictionaryConfig {
-        kind: Some(DictionaryKind::IPADIC),
-        path: None,
-    };
-    let config = TokenizerConfig {
-        dictionary,
-        user_dictionary: None,
-        mode: Mode::Normal,
-    };
     match targs.text_sub_command {
         TextSubCommand::Tokenize(args) => {
-            let tokenizer = Tokenizer::from_config(config)?;
-
-            let mut tokens = tokenizer.tokenize(&args.text)?;
-            let ts: Vec<Token> = tokens
-                .iter_mut()
-                .map(|token| {
-                    let text = token.text.to_string();
-                    let details = if let Some(details) = token.get_details() {
-                        details.iter().map(|d| d.to_string()).collect()
-                    } else {
-                        vec![]
-                    };
-                    Token { text, details }
-                })
-                .collect();
+            let ts = tokenize(&args.text)?;
             render(
                 &ts,
                 if targs.raw {
@@ -89,5 +78,49 @@ pub async fn handle(targs: TextArgs) -> Result<()> {
                 false,
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tokenize_japanese() {
+        let tokens = tokenize("東京都に住んでいます").unwrap();
+        let surfaces: Vec<&str> = tokens.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(
+            surfaces,
+            vec!["東京", "都", "に", "住ん", "で", "い", "ます"]
+        );
+
+        // details: 品詞,品詞細分類1,品詞細分類2,品詞細分類3,活用型,活用形,原形,読み,発音
+        let tokyo = &tokens[0];
+        assert_eq!(tokyo.details.len(), 9);
+        assert_eq!(tokyo.details[0], "名詞");
+        assert_eq!(tokyo.details[1], "固有名詞");
+        assert_eq!(tokyo.details[7], "トウキョウ");
+
+        let sumu = &tokens[3];
+        assert_eq!(sumu.details[0], "動詞");
+        assert_eq!(sumu.details[6], "住む");
+    }
+
+    #[test]
+    fn test_tokenize_empty_text() {
+        assert!(tokenize("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_token_table_view() {
+        let token = Token {
+            text: "東京".to_string(),
+            details: vec!["名詞".to_string(), "固有名詞".to_string()],
+        };
+        assert_eq!(token.columns().len(), 2);
+        assert_eq!(
+            token.values(),
+            vec!["東京".to_string(), "名詞,固有名詞".to_string()]
+        );
     }
 }

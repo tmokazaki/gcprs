@@ -59,3 +59,16 @@ async fn main() -> Result<()> {
         SubCommand::Text(targs) => handle_text(targs).await,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// The cli links both `ring` (via the Google API crates) and `aws-lc-rs` (via object_store),
+    /// so rustls cannot pick a crypto provider by itself. Creating the gcprs clients must still
+    /// work: they install `ring` as the process default before touching rustls.
+    #[test]
+    fn test_gcprs_clients_work_with_multiple_crypto_providers() {
+        let _client = gcprs::auth::new_client();
+        let _client = gcprs::metadata::new_client();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+    }
+}

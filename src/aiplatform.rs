@@ -16,6 +16,39 @@ use http_body_util::BodyExt;
 use mime_guess;
 use serde::{Deserialize, Serialize};
 
+/// Adapter that lets the shared authenticator be used with `google-aiplatform1_beta1`.
+///
+/// `google-aiplatform1_beta1` still depends on `google-apis-common` 7 (yup-oauth2 11), while the
+/// other Google API crates use `google-apis-common` 8 (yup-oauth2 12). The `GetToken` traits of
+/// the two versions are distinct, so implement the older one by delegating to our authenticator.
+#[derive(Clone)]
+struct AiPlatformToken(auth::Authenticator<auth::HttpsConnector>);
+
+impl aiplatform::common::GetToken for AiPlatformToken {
+    fn get_token<'a>(
+        &'a self,
+        scopes: &'a [&str],
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = std::result::Result<
+                        Option<String>,
+                        Box<dyn std::error::Error + Send + Sync>,
+                    >,
+                > + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async move {
+            self.0
+                .token(scopes)
+                .await
+                .map(|t| t.token().map(|t| t.to_owned()))
+                .map_err(|e| e.into())
+        })
+    }
+}
+
 pub struct AiPlatform {
     api: Aiplatform<auth::HttpsConnector>,
     project_id: String,
@@ -189,7 +222,7 @@ impl AiPlatform {
 
     pub fn new(auth: &auth::GcpAuth, project_id: &str, location: &str) -> Result<Self> {
         let client = auth::new_client();
-        let mut api = Aiplatform::new(client, auth.authenticator());
+        let mut api = Aiplatform::new(client, AiPlatformToken(auth.authenticator()));
         api.root_url(format!("https://{}-aiplatform.googleapis.com/", location));
         api.base_url(format!("https://{}-aiplatform.googleapis.com/", location));
         Ok(AiPlatform {
@@ -318,3 +351,7 @@ impl AiPlatform {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "aiplatform_test.rs"]
+mod tests;

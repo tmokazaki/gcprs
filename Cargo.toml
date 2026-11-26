@@ -30,18 +30,17 @@ exclude = [
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
-async-recursion = "1.1.1"
+async-recursion = "1.2.0"
 chrono = { version = "^0.4", features = ["serde"] }
 anyhow = { version = "^1.0", features = ["backtrace"] }
 http-body-util = "^0.1"
-hyper-legacy = { version = "^0.14", package = "hyper" }
-hyper-rustls-legacy = { version = "^0.25", package = "hyper-rustls" }
-yup-oauth2-legacy = { version = "^9", package = "yup-oauth2", features = ["hyper-rustls"] }
-rayon = "^1.11"
+yup-oauth2 = { version = "^12", features = ["hyper-rustls", "service-account"] }
+rustls = { version = "^0.23", default-features = false, features = ["ring", "std"] }
+rayon = "^1.12"
 urlencoding = "^2"
 webbrowser = ">0.8.3"
-regex = { version = "1.12", optional = true }
-tokio = { version = "^1.48", features = ["full"] }
+regex = { version = "1.13", optional = true }
+tokio = { version = "^1.54", features = ["full"] }
 
 google-storage1 = { version = "*", optional = true }
 google-bigquery2 = { version = "*", optional = true }
@@ -52,12 +51,12 @@ google-run2 = { version = "*", optional = true }
 google-secretmanager1 = { version = "*", optional = true }
 google-iamcredentials1 = { version = "*" }
 google-aiplatform1_beta1 = { version = "*", optional = true }
-uuid = { version = "1.18.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.29.3", features = ["v4", "fast-rng", "macro-diagnostics"] }
 mime = { version = "0.3.16", optional = true }
-jsonwebtoken = { version = "9.3.1", features = ["use_pem"] }
-mime_guess = { version = "2.0.4", optional = true }
+jsonwebtoken = { version = "12.0.0", features = ["use_pem", "rust_crypto"] }
+mime_guess = { version = "2.0.5", optional = true }
 
 [dev-dependencies]
 speculate = "*"
 rstest = "*"
-mockall = "0.13.1"
+mockall = "0.15.0"

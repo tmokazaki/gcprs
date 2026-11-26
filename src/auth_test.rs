@@ -377,4 +377,31 @@ mod tests {
         let _delegate2 = delegate1; // Copy
         let _delegate3 = delegate1; // Can still use delegate1 because it's Copy
     }
+
+    #[test]
+    fn test_install_crypto_provider_sets_process_default() {
+        install_crypto_provider();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+    }
+
+    #[test]
+    fn test_install_crypto_provider_is_idempotent() {
+        // Calling it repeatedly (e.g. once per client) must not panic.
+        install_crypto_provider();
+        install_crypto_provider();
+        let _client = new_client();
+        let _client = new_client();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_from_authenticator_returns_token() {
+        let auth = crate::test_util::access_token_auth("test-token").await;
+        let token = auth
+            .authenticator()
+            .token(&["https://www.googleapis.com/auth/cloud-platform"])
+            .await
+            .unwrap();
+        assert_eq!(token.token(), Some("test-token"));
+    }
 }

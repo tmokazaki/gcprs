@@ -1,6 +1,8 @@
 pub mod auth;
-pub mod auth_legacy;
 pub mod metadata;
+
+#[cfg(test)]
+pub(crate) mod test_util;
 
 #[cfg(feature = "aiplatform")]
 pub mod aiplatform;
