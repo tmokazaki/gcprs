@@ -351,3 +351,7 @@ impl AiPlatform {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "aiplatform_test.rs"]
+mod tests;

@@ -1,6 +1,9 @@
 pub mod auth;
 pub mod metadata;
 
+#[cfg(test)]
+pub(crate) mod test_util;
+
 #[cfg(feature = "aiplatform")]
 pub mod aiplatform;
 #[cfg(feature = "bigquery")]

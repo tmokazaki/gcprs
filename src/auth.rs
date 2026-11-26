@@ -83,6 +83,11 @@ impl GcpAuth {
         self.auth.clone()
     }
 
+    /// Wrap an already built authenticator.
+    pub fn from_authenticator(auth: Authenticator<HttpsConnector>) -> Self {
+        GcpAuth { auth }
+    }
+
     /// Authenticate with service account.
     ///
     /// If there is `GOOGLE_APPLICATION_CREDENTIALS` in environment variables, use it first. Unless

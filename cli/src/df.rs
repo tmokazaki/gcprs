@@ -197,3 +197,7 @@ pub async fn handle(dfargs: DataFusionArgs) -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "df_test.rs"]
+mod tests;

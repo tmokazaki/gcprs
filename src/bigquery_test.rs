@@ -802,4 +802,140 @@ mod tests {
         assert_eq!(param.table, deserialized.table);
         assert_eq!(param.skip_invalid_rows, deserialized.skip_invalid_rows);
     }
+
+    struct TestRow;
+
+    impl BqSchemaBuilder for TestRow {
+        fn bq_schema() -> Vec<BqTableSchema> {
+            vec![
+                BqTableSchema {
+                    name: Some("id".to_string()),
+                    type_: BqType::INTEGER,
+                    mode: BqMode::REQUIRED,
+                    fields: Box::new(vec![]),
+                    description: None,
+                },
+                BqTableSchema {
+                    name: Some("name".to_string()),
+                    type_: BqType::STRING,
+                    mode: BqMode::NULLABLE,
+                    fields: Box::new(vec![]),
+                    description: None,
+                },
+            ]
+        }
+    }
+
+    #[test]
+    fn test_bq_create_table_param_schema() {
+        let mut param = BqCreateTableParam::new();
+        param.schema::<TestRow>();
+
+        let schema = param.schema.as_ref().expect("schema should be set");
+        let fields = schema.fields.as_ref().unwrap();
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].name.as_deref(), Some("id"));
+        assert_eq!(fields[0].type_.as_deref(), Some("INTEGER"));
+        assert_eq!(fields[0].mode.as_deref(), Some("REQUIRED"));
+        assert_eq!(fields[1].name.as_deref(), Some("name"));
+        assert_eq!(fields[1].type_.as_deref(), Some("STRING"));
+        assert_eq!(fields[1].mode.as_deref(), Some("NULLABLE"));
+        // Fields added in newer API versions are left unset.
+        assert!(schema.foreign_type_info.is_none());
+    }
+
+    async fn mock_bq(server: &crate::test_util::MockServer) -> Bq {
+        let auth = crate::test_util::access_token_auth("bq-test-token").await;
+        let mut bq = Bq::new(&auth, "test-project").unwrap();
+        bq.api.root_url(server.url.clone());
+        bq.api.base_url(format!("{}bigquery/v2/", server.url));
+        bq
+    }
+
+    #[tokio::test]
+    async fn test_bq_get_table_with_mock_server() {
+        let server = crate::test_util::MockServer::start(
+            200,
+            r#"{
+                "tableReference": {"projectId": "test-project", "datasetId": "ds", "tableId": "tbl"},
+                "creationTime": "1700000000000",
+                "schema": {"fields": [
+                    {"name": "id", "type": "INTEGER", "mode": "REQUIRED"},
+                    {"name": "name", "type": "STRING", "mode": "NULLABLE"}
+                ]}
+            }"#,
+        )
+        .await;
+        let bq = mock_bq(&server).await;
+
+        let table = bq
+            .get_table(&"ds".to_string(), &"tbl".to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(table.dataset.project, "test-project");
+        assert_eq!(table.dataset.dataset, "ds");
+        assert_eq!(table.table_id, "tbl");
+        assert_eq!(table.created_at, Some(1700000000000));
+        let schemas = table.schemas.unwrap();
+        assert_eq!(schemas.len(), 2);
+        assert_eq!(schemas[0].name.as_deref(), Some("id"));
+        assert_eq!(schemas[1].name.as_deref(), Some("name"));
+
+        let req = server.request().await;
+        assert_eq!(req.method, "GET");
+        assert!(
+            req.path
+                .starts_with("/bigquery/v2/projects/test-project/datasets/ds/tables/tbl"),
+            "unexpected path: {}",
+            req.path
+        );
+        assert_eq!(req.header("authorization"), Some("Bearer bq-test-token"));
+    }
+
+    #[tokio::test]
+    async fn test_bq_create_table_sends_schema() {
+        let server = crate::test_util::MockServer::start(
+            200,
+            r#"{"tableReference": {"projectId": "test-project", "datasetId": "ds", "tableId": "tbl"}}"#,
+        )
+        .await;
+        let bq = mock_bq(&server).await;
+
+        let mut param = BqCreateTableParam::new();
+        param.schema::<TestRow>();
+        let table = bq
+            .create_table(&"ds".to_string(), &"tbl".to_string(), param)
+            .await
+            .unwrap();
+        assert_eq!(table.table_id, "tbl");
+
+        let req = server.request().await;
+        assert_eq!(req.method, "POST");
+        assert!(
+            req.path
+                .starts_with("/bigquery/v2/projects/test-project/datasets/ds/tables"),
+            "unexpected path: {}",
+            req.path
+        );
+        let body: serde_json::Value = serde_json::from_str(&req.body).unwrap();
+        assert_eq!(body["tableReference"]["tableId"], "tbl");
+        assert_eq!(body["schema"]["fields"][0]["name"], "id");
+        assert_eq!(body["schema"]["fields"][1]["type"], "STRING");
+    }
+
+    #[tokio::test]
+    async fn test_bq_get_table_error_response() {
+        let server = crate::test_util::MockServer::start(
+            404,
+            r#"{"error": {"code": 404, "message": "Not found: Table", "status": "NOT_FOUND"}}"#,
+        )
+        .await;
+        let bq = mock_bq(&server).await;
+
+        let res = bq
+            .get_table(&"ds".to_string(), &"missing".to_string())
+            .await;
+        assert!(res.is_err());
+    }
 }

@@ -235,3 +235,7 @@ pub async fn handle(mlargs: MlArgs) -> Result<()> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "ml_test.rs"]
+mod tests;
